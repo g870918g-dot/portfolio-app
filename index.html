@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Portfolio Ratio</title>
+
+  <!-- PWA 設定 -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Portfolio">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body style="font-family: system-ui; padding: 16px;">
+  <h2>持股比例</h2>
+
+  <table border="1" cellpadding="6">
+    <tr>
+      <th>市場</th>
+      <th>代碼</th>
+      <th>股數</th>
+      <th>價格 (USD)</th>
+    </tr>
+    <tr>
+      <td>TW</td><td>0050</td><td><input value="100"></td><td><input value="4.2"></td>
+    </tr>
+    <tr>
+      <td>US</td><td>AAPL</td><td><input value="15"></td><td><input value="190"></td>
+    </tr>
+  </table>
+
+  <br>
+  <button onclick="calc()">計算比例</button>
+
+  <canvas id="chart" width="300"></canvas>
+
+  <script>
+    let chart;
+
+    function calc() {
+      const rows = document.querySelectorAll("table tr");
+      let tw = 0, us = 0;
+
+      rows.forEach((r, i) => {
+        if (i === 0) return;
+        const market = r.children[0].innerText;
+        const shares = Number(r.children[2].children[0].value);
+        const price = Number(r.children[3].children[0].value);
+        const value = shares * price;
+
+        if (market === "TW") tw += value;
+        else us += value;
+      });
+
+      const ctx = document.getElementById("chart");
+      if (chart) chart.destroy();
+
+      chart = new Chart(ctx, {
+        type: "pie",
+        data: {
+          labels: ["台股", "美股"],
+          datasets: [{ data: [tw, us] }]
+        }
+      });
+    }
+  </script>
+</body>
+</html>
