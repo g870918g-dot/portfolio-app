@@ -165,7 +165,8 @@ function calc(){
     if(priceText.includes("USD")) rawPrice = Number(priceText.replace(" USD",""))*usdToTwd;
     else rawPrice = Number(priceText.replace(" TWD",""));
     const total = shares*rawPrice;
-    rows[i].cells[3].innerText = total.toFixed(2);
+    // ✅ 四捨五入 + 千位逗號
+    rows[i].cells[3].innerText = total?total.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ","):"0";
     totalTWD += total;
   }
 
@@ -173,20 +174,21 @@ function calc(){
   for(let i=1;i<rows.length;i++){
     const shares = Number(rows[i].cells[1].children[0].value);
     if(shares<=0) continue;
-    const total = Number(rows[i].cells[3].innerText);
+    const total = Number(rows[i].cells[3].innerText.replace(/,/g,'')); // 去掉逗號再計算
     const sym = rows[i].cells[0].children[0].value.toUpperCase();
     stockTotals.push({symbol:sym,total,isTW:isTaiwanStock(sym)});
-    rows[i].cells[4].innerText = totalTWD?(total/totalTWD*100).toFixed(2):0;
+    // ✅ 百分比保留小數點一位
+    rows[i].cells[4].innerText = totalTWD?((total/totalTWD)*100).toFixed(1):0;
   }
 
-  // 前6大 + Others
+  // 以下圓餅圖邏輯不變
+  let chartDataLabels=[];
+  let chartDataValues=[];
+  let chartDataColors=[];
+
   stockTotals.sort((a,b)=>b.total - a.total);
   const top6 = stockTotals.slice(0,6);
   const others = stockTotals.slice(6);
-
-  const chartDataLabels=[];
-  const chartDataValues=[];
-  const chartDataColors=[];
 
   top6.forEach((s,i)=>{
     chartDataLabels.push(s.symbol);
@@ -210,7 +212,7 @@ function calc(){
         const label = context.label||'';
         const value = context.parsed;
         const total = chartDataValues.reduce((a,b)=>a+b,0);
-        const pct = total?(value/total*100).toFixed(2):0;
+        const pct = total?(value/total*100).toFixed(1):0; // ✅ 小數點一位
         return `${label}: ${pct}%`;
       }}}}
     }
@@ -218,6 +220,7 @@ function calc(){
 
   saveHoldings();
 }
+
 
 // —— 表格依總價重新排序 —
 function sortTableByTotal(){
@@ -240,4 +243,5 @@ window.onload=loadHoldings;
 </script>
 </body>
 </html>
+
 
