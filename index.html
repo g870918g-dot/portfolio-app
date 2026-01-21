@@ -30,6 +30,7 @@
       <th>代碼</th>
       <th>股數</th>
       <th>價格 (USD)</th>
+      <th>總價</th>
     </tr>
   </table>
 
@@ -47,7 +48,7 @@
 
   <script>
     let chart;
-    let usdToTwd = 30; // 假設匯率，之後可改成抓 API
+    let usdToTwd = 30; // 匯率，可自行更新
 
     // 儲存與載入持股
     function saveHoldings() {
@@ -68,6 +69,7 @@
     function loadHoldings() {
       const data = JSON.parse(localStorage.getItem("holdings") || "[]");
       data.forEach(h => addRow(h));
+      calc();
     }
 
     function addRow(h=null) {
@@ -83,6 +85,7 @@
         <td><input placeholder="2330 / AAPL"></td>
         <td><input type="number" value="0"></td>
         <td><input type="number" value="0"></td>
+        <td>0</td>
       `;
       if (h) {
         row.cells[0].children[0].value = h.market;
@@ -95,22 +98,36 @@
 
     async function updatePrices() {
       const rows = document.querySelectorAll("#holdings tr");
+      const symbols = [];
+
       for (let i = 1; i < rows.length; i++) {
         const market = rows[i].cells[0].children[0].value;
         let symbol = rows[i].cells[1].children[0].value.trim();
         if (!symbol) continue;
-
         if (market === "TW") symbol += ".TW";
+        symbols.push(symbol);
+      }
 
-        const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbol}`;
-        try {
-          const res = await fetch(url);
-          const data = await res.json();
-          const price = data.quoteResponse.result[0]?.regularMarketPrice;
-          if (price) rows[i].cells[3].children[0].value = price.toFixed(2);
-        } catch(e) {
-          console.log(symbol, "更新失敗", e);
+      if (symbols.length === 0) return;
+
+      const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbols.join(",")}`;
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        const results = data.quoteResponse.result;
+
+        for (let i = 1; i < rows.length; i++) {
+          const market = rows[i].cells[0].children[0].value;
+          let symbol = rows[i].cells[1].children[0].value.trim();
+          if (!symbol) continue;
+          const lookupSymbol = market === "TW" ? symbol + ".TW" : symbol;
+          const stock = results.find(s => s.symbol === lookupSymbol);
+          if (stock?.regularMarketPrice) {
+            rows[i].cells[3].children[0].value = stock.regularMarketPrice.toFixed(2);
+          }
         }
+      } catch(e) {
+        console.log("股價更新失敗", e);
       }
       saveHoldings();
       calc();
@@ -126,16 +143,17 @@
         const market = rows[i].cells[0].children[0].value;
         const shares = Number(rows[i].cells[2].children[0].value);
         let price = Number(rows[i].cells[3].children[0].value);
+
         if (currency === "TWD") price *= usdToTwd;
 
-        const value = shares * price;
-        values.push({label: rows[i].cells[1].children[0].value, value: value});
+        const total = shares * price;
+        rows[i].cells[4].innerText = total.toFixed(2);
 
-        if (market === "TW") tw += value;
-        else us += value;
+        values.push({label: rows[i].cells[1].children[0].value, value: total});
+
+        if (market === "TW") tw += total;
+        else us += total;
       }
-
-      const total = tw + us;
 
       const ctx = document.getElementById("chart");
       if (chart) chart.destroy();
