@@ -90,22 +90,25 @@ function loadHoldings(){
 
 // ————— 建立一列 —————
 function addRow(h=null){
-  const table=document.getElementById("holdings");
-  const row=table.insertRow();
-  row.innerHTML=`
+  const table = document.getElementById("holdings");
+  const row = table.insertRow();
+  row.innerHTML = `
     <td><input placeholder="AAPL / 2330"></td>
     <td><input type="number" value="0"></td>
     <td>0</td>
     <td>0</td>
     <td>0</td>
   `;
+  
   if(h){
-    row.cells[0].children[0].value=h.symbol;
-    row.cells[1].children[0].value=h.shares;
+    row.cells[0].children[0].value = h.symbol;
+    row.cells[1].children[0].value = h.shares;
   }
-  saveHoldings();
-  updatePrices();
+
+  saveHoldings();      // 儲存目前持股
+  updatePrices();      // 抓價格並更新計算
 }
+
 
 // ————— 匯率抓取（USD→TWD） —————
 async function updateExchangeRate(){
@@ -197,3 +200,4 @@ function updateChartColors(){
   const scheme=document.getElementById("colorScheme").value;
   if(chart){
     chart.data
+
