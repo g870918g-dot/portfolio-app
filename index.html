@@ -59,9 +59,10 @@ let chart;
 let usdToTwd = 30; 
 const FINNHUB_KEY = "d5ofc59r01qjast6ddl0d5ofc59r01qjast6ddlg"; // <-- 放你的 Finnhub Key
 
-const colorSchemes = {
-  black: ["#212121","#424242","#616161","#9E9E9E","#757575","#BDBDBD"]
-};
+// 台股暖色系 / 美股冷色系 / 其他顏色
+const warmColors = ["#FF6F61","#FFA07A","#FF8C00","#FFD700","#FFB347","#FF7F50"];
+const coolColors = ["#6495ED","#00CED1","#20B2AA","#4682B4","#1E90FF","#00BFFF"];
+const othersColor = "#A9A9A9";
 
 // ————— 儲存 / 讀取 localStorage —————
 function saveHoldings(){
@@ -154,10 +155,9 @@ async function updateExchangeRate(){
   }catch(e){console.log("匯率抓取失敗", e);}
 }
 
-// ————— 計算總價與圓餅圖 —————
+// ————— 計算總價與圓餅圖（前六大 + Others） —————
 function calc(){
   const rows = document.querySelectorAll("#holdings tr");
-  const labels=[],dataArr=[];
   let totalTWD = 0;
 
   // 計算每行總價
@@ -175,24 +175,62 @@ function calc(){
     totalTWD += total;
   }
 
-  // 計算佔比 & 圓餅圖資料
+  // 計算佔比 & 圓餅圖
+  let stockTotals = [];
   for(let i=1;i<rows.length;i++){
     const shares = Number(rows[i].cells[1].children[0].value);
+    if(shares <= 0) continue;
     const total = Number(rows[i].cells[3].innerText);
-    const pct = totalTWD ? (total/totalTWD*100) : 0;
-    rows[i].cells[4].innerText = pct.toFixed(2);
-    if(shares > 0){
-      labels.push(rows[i].cells[0].children[0].value.toUpperCase());
-      dataArr.push(total);
-    }
+    const sym = rows[i].cells[0].children[0].value.toUpperCase();
+    stockTotals.push({symbol: sym, total, isTW: isTaiwanStock(sym)});
+    rows[i].cells[4].innerText = totalTWD ? (total/totalTWD*100).toFixed(2) : 0;
+  }
+
+  // 前6大 + Others
+  stockTotals.sort((a,b)=>b.total - a.total);
+  const top6 = stockTotals.slice(0,6);
+  const others = stockTotals.slice(6);
+
+  const chartDataLabels = [];
+  const chartDataValues = [];
+  const chartDataColors = [];
+
+  top6.forEach((s,i)=>{
+    chartDataLabels.push(s.symbol);
+    chartDataValues.push(s.total);
+    chartDataColors.push(s.isTW ? warmColors[i % warmColors.length] : coolColors[i % coolColors.length]);
+  });
+
+  if(others.length > 0){
+    chartDataLabels.push("Others");
+    chartDataValues.push(others.reduce((sum,s)=>sum+s.total,0));
+    chartDataColors.push(othersColor);
   }
 
   const ctx = document.getElementById("chart");
   if(chart) chart.destroy();
   chart = new Chart(ctx,{
     type:"pie",
-    data:{labels,datasets:[{data:dataArr,backgroundColor:colorSchemes["black"]}]},
-    options:{responsive:true}
+    data:{
+      labels: chartDataLabels,
+      datasets:[{data: chartDataValues, backgroundColor: chartDataColors}]
+    },
+    options:{
+      responsive:true,
+      plugins:{
+        tooltip:{
+          callbacks:{
+            label: function(context){
+              const label = context.label || '';
+              const value = context.parsed;
+              const total = chartDataValues.reduce((a,b)=>a+b,0);
+              const pct = total ? (value/total*100).toFixed(2) : 0;
+              return `${label}: ${pct}%`;
+            }
+          }
+        }
+      }
+    }
   });
 
   saveHoldings();
@@ -208,6 +246,7 @@ function updateChartColors(){
 }
 
 window.onload = loadHoldings;
+
 </script>
 </body>
 </html>
