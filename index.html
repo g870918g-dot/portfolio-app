@@ -5,11 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>持股比例 App</title>
 
-<link rel="manifest" href="manifest.json">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Portfolio">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
@@ -48,6 +43,7 @@ button,select{margin:4px;}
     圓餅圖色系：
     <select id="colorScheme" onchange="updateChartColors()">
       <option value="black">黑色系</option>
+      <option value="blue">藍色系</option>
     </select>
 
   </div>
@@ -64,12 +60,9 @@ let chart;
 let usdToTwd = 30; 
 const FINNHUB_KEY = "d5ofc59r01qjast6ddl0d5ofc59r01qjast6ddlg"; // <-- 放你的 Finnhub Key
 
-// 圓餅圖黑色系
 const colorSchemes = {
-  black: [
-    "#212121", "#424242", "#616161",
-    "#9E9E9E", "#757575", "#BDBDBD"
-  ]
+  black: ["#212121","#424242","#616161","#9E9E9E","#757575","#BDBDBD"]
+  blue: ["＃4682B4","＃4169E1","＃000080","＃1E90FF","＃7B68EE","＃483D8B"
 };
 
 // ————— 讀取 / 儲存 —————
@@ -126,9 +119,7 @@ async function updateExchangeRate(){
 }
 
 // ————— 判斷是否台股 —————
-function isTaiwanStock(symbol){
-  return /^\d+$/.test(symbol);
-}
+function isTaiwanStock(symbol){ return /^\d+$/.test(symbol); }
 
 // ————— 抓股價 —————
 async function updatePrices(){
@@ -139,13 +130,11 @@ async function updatePrices(){
     try{
       let price=0;
       if(isTaiwanStock(sym)){
-        // 台股：proxy 抓前一天收盤價
         const res=await fetch(`https://stock-quote-proxy.sukailin1124.workers.dev/quote?symbol=${sym}&market=tse`);
         const data=await res.json();
         price = data.price || 0;
         rows[i].cells[2].innerText = `${price.toFixed(2)} TWD`;
       } else {
-        // 美股：Finnhub
         const res=await fetch(`https://finnhub.io/api/v1/quote?symbol=${sym}&token=${FINNHUB_KEY}`);
         const data=await res.json();
         price = data.c || 0;
@@ -154,7 +143,6 @@ async function updatePrices(){
     }catch(e){
       console.log("抓股價失敗：", e);
       rows[i].cells[2].innerText = "0";
-      price = 0;
     }
   }
   calc();
@@ -166,7 +154,6 @@ function calc(){
   const labels=[],dataArr=[]; 
   let totalTWD=0;
 
-  // 先計算總價
   for(let i=1;i<rows.length;i++){
     const shares=Number(rows[i].cells[1].children[0].value);
     let rawPrice=0;
@@ -182,7 +169,6 @@ function calc(){
     totalTWD += total;
   }
 
-  // 佔比 & 圓餅圖資料
   for(let i=1;i<rows.length;i++){
     const shares=Number(rows[i].cells[1].children[0].value);
     const total = Number(rows[i].cells[3].innerText);
@@ -210,13 +196,4 @@ function calc(){
 function updateChartColors(){
   const scheme=document.getElementById("colorScheme").value;
   if(chart){
-    chart.data.datasets[0].backgroundColor = colorSchemes[scheme];
-    chart.update();
-  }
-}
-
-window.onload=loadHoldings;
-</script>
-</body>
-</html>
-
+    chart.data
