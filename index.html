@@ -127,11 +127,16 @@ async function updatePricesForRow(row){
   try{
     let price = 0;
     if(isTaiwanStock(sym)){
-      const res = await fetch(`https://stock-quote-proxy.sukailin1124.workers.dev/quote?symbol=${sym}&market=tse`);
-      const data = await res.json();
-      price = data.price || 0;
-      row.cells[2].innerText = `${price.toFixed(2)} TWD`;
-    } else {
+  try {
+    const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${sym}.TW`);
+    const data = await res.json();
+    price = data.chart.result[0].meta.regularMarketPrice || 0;
+    row.cells[2].innerText = `${price.toFixed(2)} TWD`;
+  } catch(e){
+    console.log("抓台股價格失敗", e);
+    row.cells[2].innerText = "0";
+  }
+} else {
       const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${sym}&token=${FINNHUB_KEY}`);
       const data = await res.json();
       price = data.c || 0;
@@ -250,3 +255,4 @@ window.onload = loadHoldings;
 </script>
 </body>
 </html>
+
