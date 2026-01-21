@@ -112,13 +112,16 @@ function addRow(h=null){
   updatePricesForRow(row);
 }
 
-// —— 更新整表股價 —
-function updatePrices(){
-  const rows = document.querySelectorAll("#holdings tr");
-  for(let i=1;i<rows.length;i++) updatePricesForRow(rows[i]);
+// —— 更新整表股價 —— 改成等待所有 fetch 完成
+async function updatePrices(){
+  const rows = Array.from(document.querySelectorAll("#holdings tr")).slice(1);
+  // 建立一個 Promise array
+  const promises = rows.map(row => updatePricesForRow(row));
+  await Promise.all(promises);
+  sortTableByTotal();
 }
 
-// —— 更新單行股價 —
+// —— 更新單行股價 —— 改成回傳 Promise
 async function updatePricesForRow(row){
   const sym = row.cells[0].children[0].value.trim().toUpperCase();
   if(!sym) return;
@@ -138,7 +141,6 @@ async function updatePricesForRow(row){
     }
   } catch(e){ console.log("抓股價失敗",e); row.cells[2].innerText="0"; }
   calc();
-  sortTableByTotal();
 }
 
 // —— 更新匯率 —
@@ -238,3 +240,4 @@ window.onload=loadHoldings;
 </script>
 </body>
 </html>
+
