@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portfolio Ratio</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Portfolio">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: system-ui; padding: 16px; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #aaa; padding: 6px; text-align: center; }
+    input { width: 60px; }
+    select { width: 50px; }
+    button { margin: 4px; }
+  </style>
+</head>
+<body>
+  <h2>持股比例 App</h2>
+
+  <table id="holdings">
+    <tr>
+      <th>市場</th>
+      <th>代碼</th>
+      <th>股數</th>
+      <th>價格 (USD)</th>
+    </tr>
+  </table>
+
+  <br>
+  <button onclick="addRow()">新增持股</button>
+  <button onclick="updatePrices()">更新股價</button>
+  <button onclick="calc()">計算比例</button>
+  <select id="currency" onchange="calc()">
+    <option value="USD">USD</option>
+    <option value="TWD">TWD</option>
+  </select>
+  <span>選擇幣別</span>
+
+  <canvas id="chart" width="300"></canvas>
+
+  <script>
+    let chart;
+    let usdToTwd = 30; // 假設匯率，之後可改成抓 API
+
+    // 儲存與載入持股
+    function saveHoldings() {
+      const table = document.getElementById("holdings");
+      const data = [];
+      for (let i = 1; i < table.rows.length; i++) {
+        const r = table.rows[i];
+        data.push({
+          market: r.cells[0].children[0].value,
+          symbol: r.cells[1].children[0].value,
+          shares: Number(r.cells[2].children[0].value),
+          price: Number(r.cells[3].children[0].value)
+        });
+      }
+      localStorage.setItem("holdings", JSON.stringify(data));
+    }
+
+    function loadHoldings() {
+      const data = JSON.parse(localStorage.getItem("holdings") || "[]");
+      data.forEach(h => addRow(h));
+    }
+
+    function addRow(h=null) {
+      const table = document.getElementById("holdings");
+      const row = table.insertRow();
+      row.innerHTML = `
+        <td>
+          <select>
+            <option value="TW">TW</option>
+            <option value="US">US</option>
+          </select>
+        </td>
+        <td><input placeholder="2330 / AAPL"></td>
+        <td><input type="number" value="0"></td>
+        <td><input type="number" value="0"></td>
+      `;
+      if (h) {
+        row.cells[0].children[0].value = h.market;
+        row.cells[1].children[0].value = h.symbol;
+        row.cells[2].children[0].value = h.shares;
+        row.cells[3].children[0].value = h.price;
+      }
+      saveHoldings();
+    }
+
+    async function updatePrices() {
+      const rows = document.querySelectorAll("#holdings tr");
+      for (let i = 1; i < rows.length; i++) {
+        const market = rows[i].cells[0].children[0].value;
+        let symbol = rows[i].cells[1].children[0].value.trim();
+        if (!symbol) continue;
+
+        if (market === "TW") symbol += ".TW";
+
+        const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbol}`;
+        try {
+          const res = await fetch(url);
+          const data = await res.json();
+          const price = data.quoteResponse.result[0]?.regularMarketPrice;
+          if (price) rows[i].cells[3].children[0].value = price.toFixed(2);
+        } catch(e) {
+          console.log(symbol, "更新失敗", e);
+        }
+      }
+      saveHoldings();
+      calc();
+    }
+
+    function calc() {
+      const currency = document.getElementById("currency").value;
+      const rows = document.querySelectorAll("#holdings tr");
+      let tw = 0, us = 0;
+      const values = [];
+
+      for (let i = 1; i < rows.length; i++) {
+        const market = rows[i].cells[0].children[0].value;
+        const shares = Number(rows[i].cells[2].children[0].value);
+        let price = Number(rows[i].cells[3].children[0].value);
+        if (currency === "TWD") price *= usdToTwd;
+
+        const value = shares * price;
+        values.push({label: rows[i].cells[1].children[0].value, value: value});
+
+        if (market === "TW") tw += value;
+        else us += value;
+      }
+
+      const total = tw + us;
+
+      const ctx = document.getElementById("chart");
+      if (chart) chart.destroy();
+      chart = new Chart(ctx, {
+        type: "pie",
+        data: {
+          labels: ["台股", "美股", ...values.map(v => v.label)],
+          datasets: [{
+            data: [tw, us, ...values.map(v => v.value)],
+            backgroundColor: ["#FF6384","#36A2EB","#FFCE56","#4BC0C0","#9966FF","#FF9F40","#C9CBCF"]
+          }]
+        },
+        options: { responsive: true }
+      });
+
+      saveHoldings();
+    }
+
+    window.onload = loadHoldings;
+  </script>
+</body>
+</html>
