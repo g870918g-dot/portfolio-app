@@ -54,7 +54,7 @@ canvas#historyChart{margin-top:20px;}
 <script>
 let chart, historyChart;
 let usdToTwd = 30;
-const FMP_KEY = "BO9vWyNoCUNezdFLxo4mMKOpdevhgHV5"; // <-- 填入你自己的
+const FMP_KEY = "YOUR_FMP_KEY"; // <-- 填入你的 FMP API key
 
 function saveHoldings(){
   const table = document.getElementById("holdings");
@@ -70,7 +70,7 @@ function loadHoldings(){
   const data = JSON.parse(localStorage.getItem("holdings")||"[]");
   data.forEach(h=>addRow(h));
   updatePrices();
-  setInterval(updatePrices, 120*60000); // 自動每分鐘更新
+  setInterval(updatePrices, 120*60*1000); // 自動每兩小時更新
 }
 
 function addRow(h=null){
@@ -86,6 +86,7 @@ function addRow(h=null){
   `;
   if(h){row.cells[0].children[0].value=h.symbol; row.cells[1].children[0].value=h.shares;}
   saveHoldings();
+  updatePrices(); // 新增後立即抓股價
 }
 
 async function updateRate(){
@@ -97,7 +98,6 @@ async function updateRate(){
 }
 
 function normalizeSymbol(sym){
-  // 自動補 .TW / .US
   if(/^\d{3,4}$/.test(sym)) return sym+".TW";
   else if(/^[A-Za-z]+$/.test(sym)) return sym;
   return sym;
@@ -113,7 +113,7 @@ async function updatePrices(){
   }
   if(symbols.length===0) return;
 
-  const url=`https://financialmodelingprep.com/api/v3/quote-short/${symbols.join(",")}?apikey=${FMP_KEY}`;
+  const url=`https://financialmodelingprep.com/stable/batch-quote?symbols=${symbols.join(",")}?apikey=${FMP_KEY}`;
   try{
     const res=await fetch(url);
     const data=await res.json();
@@ -132,30 +132,40 @@ function calc(){
   const labels=[],dataArr=[];
   let totalSum=0;
 
+  // 計算總價
   for(let i=1;i<rows.length;i++){
     const shares=Number(rows[i].cells[1].children[0].value);
     let price=Number(rows[i].cells[2].innerText);
     if(currency==="TWD") price*=usdToTwd;
     const total=shares*price;
     rows[i].cells[3].innerText=total.toFixed(2);
-    labels.push(rows[i].cells[0].children[0].value.toUpperCase());
-    dataArr.push(total);
     totalSum+=total;
   }
 
+  // 計算佔比，只把股數>0加入圓餅圖
   for(let i=1;i<rows.length;i++){
-    rows[i].cells[4].innerText=totalSum?((dataArr[i-1]/totalSum)*100).toFixed(2):0;
+    const shares=Number(rows[i].cells[1].children[0].value);
+    const total=Number(rows[i].cells[3].innerText);
+    const pct=totalSum?((total/totalSum)*100):0;
+    rows[i].cells[4].innerText=pct.toFixed(2);
+    if(shares>0){
+      labels.push(rows[i].cells[0].children[0].value.toUpperCase());
+      dataArr.push(total);
+    }
   }
 
+  // 更新圓餅圖
   const ctx=document.getElementById("chart");
   if(chart) chart.destroy();
   chart=new Chart(ctx,{type:"pie",data:{labels,datasets:[{data:dataArr}]},options:{responsive:true}});
+
+  saveHoldings();
 }
 
 async function showHistory(btn){
   const row=btn.parentElement.parentElement;
   const sym=normalizeSymbol(row.cells[0].children[0].value.trim());
-  let histSym=sym.replace(".TW","")+".TW"; // FMP台股用原始
+  const histSym=sym.replace(".TW",""); // FMP台股
   const url=`https://financialmodelingprep.com/api/v3/historical-price-full/${histSym}?serietype=line&apikey=${FMP_KEY}`;
   try{
     const res=await fetch(url);
