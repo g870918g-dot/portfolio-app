@@ -4,9 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>持股比例 App</title>
-
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
 <style>
 body{font-family:system-ui;margin:0;padding:16px;}
 .container{display:flex;gap:20px;flex-wrap:wrap;}
@@ -30,7 +28,7 @@ button,select{margin:4px;}
       <tr>
         <th>股票代碼</th>
         <th>股數</th>
-        <th>股價</th>
+        <th>股價（顯示幣別）</th>
         <th>總價（TWD）</th>
         <th>佔比 (%)</th>
       </tr>
@@ -39,12 +37,10 @@ button,select{margin:4px;}
     <button onclick="addRow()">新增持股</button>
     <button onclick="updatePrices()">更新股價</button>
     <br>
-
     圓餅圖色系：
     <select id="colorScheme" onchange="updateChartColors()">
       <option value="black">黑色系</option>
     </select>
-
   </div>
 
   <div class="right">
@@ -53,19 +49,16 @@ button,select{margin:4px;}
 </div>
 
 <script>
-
-// ————— 全局變數 —————
+// —— 全局變數 ——
 let chart;
-let usdToTwd = 30; 
-const FINNHUB_KEY = "d5ofc59r01qjast6ddl0d5ofc59r01qjast6ddlg"; // <-- 放你的 Finnhub Key
-const FINMIND_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNi0wMS0yMiAwMjowMzo1MyIsInVzZXJfaWQiOiJnODcwOTE4ZyIsImVtYWlsIjoiZzg3MDkxOGdAZ21haWwuY29tIiwiaXAiOiI2MS4yMzAuMzcuMzEifQ.sunKX_jHdSZAmXUMztvTVOjm9ZCZYNN_xm1fm-Xi7aE"; // <-- 放你的 FinMind Token
-
-// 台股暖色系 / 美股冷色系 / 其他顏色
+let usdToTwd = 30;
+const FINNHUB_KEY = "d5ofc59r01qjast6ddl0d5ofc59r01qjast6ddlg";   // 替換成你的Finnhub Key
+const FINMIND_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNi0wMS0yMiAwMjowMzo1MyIsInVzZXJfaWQiOiJnODcwOTE4ZyIsImVtYWlsIjoiZzg3MDkxOGdAZ21haWwuY29tIiwiaXAiOiI2MS4yMzAuMzcuMzEifQ.sunKX_jHdSZAmXUMztvTVOjm9ZCZYNN_xm1fm-Xi7aE"; // 替換成你的FinMind Token
 const warmColors = ["#FF6F61","#FFA07A","#FF8C00","#FFD700","#FFB347","#FF7F50"];
 const coolColors = ["#6495ED","#00CED1","#20B2AA","#4682B4","#1E90FF","#00BFFF"];
 const othersColor = "#A9A9A9";
 
-// ————— 儲存 / 讀取 localStorage —————
+// —— localStorage 儲存 / 讀取 —
 function saveHoldings(){
   const table = document.getElementById("holdings");
   const data = [];
@@ -73,28 +66,37 @@ function saveHoldings(){
     const r = table.rows[i];
     const sym = r.cells[0].children[0].value.trim().toUpperCase();
     const shares = Number(r.cells[1].children[0].value);
-    if(sym && shares >= 0){
-      data.push({symbol: sym, shares});
-    }
+    if(sym && shares >= 0){ data.push({symbol:sym, shares}); }
   }
   localStorage.setItem("holdings", JSON.stringify(data));
 }
 
 function loadHoldings(){
   const data = JSON.parse(localStorage.getItem("holdings")||"[]");
-  data.forEach(h => addRow(h));
+  data.forEach(h=>addRow(h));
   updateExchangeRate();
   updatePrices();
   setInterval(updatePrices, 2*60*60*1000); // 每2小時更新美股價格
   setInterval(updateExchangeRate, 24*60*60*1000); // 每24小時更新匯率
 }
 
-// ————— 判斷台股 —————
+// —— 判斷台股（包含ETF/槓桿ETF） —
 function isTaiwanStock(symbol){
-  return /^\d+$/.test(symbol) || /^00\d{3}[LR]?$/.test(symbol); // 包含ETF
+  return /^\d+$/.test(symbol) || /^00\d{3}[LR]?$/.test(symbol);
 }
 
-// ————— 新增行 —————
+// —— 計算前一個交易日 —
+function getPreviousTradeDate(){
+  const today = new Date();
+  let d = new Date(today);
+  do { d.setDate(d.getDate()-1); } while(d.getDay()===0||d.getDay()===6);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+// —— 新增行 —
 function addRow(h=null){
   const table = document.getElementById("holdings");
   const row = table.insertRow();
@@ -105,56 +107,41 @@ function addRow(h=null){
     <td>0</td>
     <td>0</td>
   `;
-  if(h){
-    row.cells[0].children[0].value = h.symbol;
-    row.cells[1].children[0].value = h.shares;
-  }
+  if(h){ row.cells[0].children[0].value=h.symbol; row.cells[1].children[0].value=h.shares; }
   saveHoldings();
   updatePricesForRow(row);
 }
 
-// ————— 更新股價（整表） —————
+// —— 更新整表股價 —
 function updatePrices(){
   const rows = document.querySelectorAll("#holdings tr");
-  for(let i=1;i<rows.length;i++){
-    updatePricesForRow(rows[i]);
-  }
+  for(let i=1;i<rows.length;i++) updatePricesForRow(rows[i]);
 }
 
-// ————— 更新單行股價 —————
+// —— 更新單行股價 —
 async function updatePricesForRow(row){
   const sym = row.cells[0].children[0].value.trim().toUpperCase();
   if(!sym) return;
+  let price = 0;
   try{
-    let price = 0;
     if(isTaiwanStock(sym)){
-      // FinMind API抓台股收盤價
-      const today = new Date();
-      const yyyy = today.getFullYear();
-      const mm = String(today.getMonth()+1).padStart(2,'0');
-      const dd = String(today.getDate()).padStart(2,'0');
-      const dateStr = `${yyyy}-${mm}-${dd}`;
+      const dateStr = getPreviousTradeDate();
       const res = await fetch(`https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPrice&data_id=${sym}&start_date=${dateStr}&end_date=${dateStr}&token=${FINMIND_TOKEN}`);
       const data = await res.json();
-      if(data.data && data.data.length>0){
-        price = data.data[0].close;
-      }
+      if(data.data && data.data.length>0) price = data.data[0].close;
       row.cells[2].innerText = `${price.toFixed(2)} TWD`;
     } else {
-      // 美股
       const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${sym}&token=${FINNHUB_KEY}`);
       const data = await res.json();
       price = data.c || 0;
       row.cells[2].innerText = `${price.toFixed(2)} USD`;
     }
-  }catch(e){
-    console.log("抓股價失敗：", e);
-    row.cells[2].innerText = "0";
-  }
+  } catch(e){ console.log("抓股價失敗",e); row.cells[2].innerText="0"; }
   calc();
+  sortTableByTotal();
 }
 
-// ————— 更新匯率 —————
+// —— 更新匯率 —
 async function updateExchangeRate(){
   try{
     const res = await fetch("https://api.exchangerate.host/latest?base=USD&symbols=TWD");
@@ -165,21 +152,17 @@ async function updateExchangeRate(){
   }catch(e){console.log("匯率抓取失敗", e);}
 }
 
-// ————— 計算總價與圓餅圖（前六大 + Others） —————
+// —— 計算總價與圓餅圖 —
 function calc(){
   const rows = document.querySelectorAll("#holdings tr");
   let totalTWD = 0;
-
   for(let i=1;i<rows.length;i++){
     const shares = Number(rows[i].cells[1].children[0].value);
     let rawPrice = 0;
     const priceText = rows[i].cells[2].innerText;
-    if(priceText.includes("USD")){
-      rawPrice = Number(priceText.replace(" USD","")) * usdToTwd;
-    } else {
-      rawPrice = Number(priceText.replace(" TWD",""));
-    }
-    const total = shares * rawPrice;
+    if(priceText.includes("USD")) rawPrice = Number(priceText.replace(" USD",""))*usdToTwd;
+    else rawPrice = Number(priceText.replace(" TWD",""));
+    const total = shares*rawPrice;
     rows[i].cells[3].innerText = total.toFixed(2);
     totalTWD += total;
   }
@@ -187,11 +170,11 @@ function calc(){
   let stockTotals = [];
   for(let i=1;i<rows.length;i++){
     const shares = Number(rows[i].cells[1].children[0].value);
-    if(shares <= 0) continue;
+    if(shares<=0) continue;
     const total = Number(rows[i].cells[3].innerText);
     const sym = rows[i].cells[0].children[0].value.toUpperCase();
-    stockTotals.push({symbol: sym, total, isTW: isTaiwanStock(sym)});
-    rows[i].cells[4].innerText = totalTWD ? (total/totalTWD*100).toFixed(2) : 0;
+    stockTotals.push({symbol:sym,total,isTW:isTaiwanStock(sym)});
+    rows[i].cells[4].innerText = totalTWD?(total/totalTWD*100).toFixed(2):0;
   }
 
   // 前6大 + Others
@@ -199,17 +182,16 @@ function calc(){
   const top6 = stockTotals.slice(0,6);
   const others = stockTotals.slice(6);
 
-  const chartDataLabels = [];
-  const chartDataValues = [];
-  const chartDataColors = [];
+  const chartDataLabels=[];
+  const chartDataValues=[];
+  const chartDataColors=[];
 
   top6.forEach((s,i)=>{
     chartDataLabels.push(s.symbol);
     chartDataValues.push(s.total);
-    chartDataColors.push(s.isTW ? warmColors[i % warmColors.length] : coolColors[i % coolColors.length]);
+    chartDataColors.push(s.isTW?warmColors[i%warmColors.length]:coolColors[i%coolColors.length]);
   });
-
-  if(others.length > 0){
+  if(others.length>0){
     chartDataLabels.push("Others");
     chartDataValues.push(others.reduce((sum,s)=>sum+s.total,0));
     chartDataColors.push(othersColor);
@@ -217,44 +199,42 @@ function calc(){
 
   const ctx = document.getElementById("chart");
   if(chart) chart.destroy();
-  chart = new Chart(ctx,{
+  chart=new Chart(ctx,{
     type:"pie",
-    data:{
-      labels: chartDataLabels,
-      datasets:[{data: chartDataValues, backgroundColor: chartDataColors}]
-    },
+    data:{labels:chartDataLabels,datasets:[{data:chartDataValues,backgroundColor:chartDataColors}]},
     options:{
       responsive:true,
-      plugins:{
-        tooltip:{
-          callbacks:{
-            label: function(context){
-              const label = context.label || '';
-              const value = context.parsed;
-              const total = chartDataValues.reduce((a,b)=>a+b,0);
-              const pct = total ? (value/total*100).toFixed(2) : 0;
-              return `${label}: ${pct}%`;
-            }
-          }
-        }
-      }
+      plugins:{tooltip:{callbacks:{label:function(context){
+        const label = context.label||'';
+        const value = context.parsed;
+        const total = chartDataValues.reduce((a,b)=>a+b,0);
+        const pct = total?(value/total*100).toFixed(2):0;
+        return `${label}: ${pct}%`;
+      }}}}
     }
   });
 
   saveHoldings();
 }
 
-// ————— 色系切換 —————
+// —— 表格依總價重新排序 —
+function sortTableByTotal(){
+  const table=document.getElementById("holdings");
+  const rows=Array.from(table.rows).slice(1);
+  rows.sort((a,b)=>Number(b.cells[3].innerText)-Number(a.cells[3].innerText));
+  rows.forEach(r=>table.appendChild(r));
+}
+
+// —— 色系切換 —
 function updateChartColors(){
-  const scheme = document.getElementById("colorScheme").value;
+  const scheme=document.getElementById("colorScheme").value;
   if(chart){
-    chart.data.datasets[0].backgroundColor = scheme=="black" ? [...warmColors,...coolColors] : chart.data.datasets[0].backgroundColor;
+    chart.data.datasets[0].backgroundColor=scheme=="black"?[...warmColors,...coolColors]:chart.data.datasets[0].backgroundColor;
     chart.update();
   }
 }
 
-window.onload = loadHoldings;
-
+window.onload=loadHoldings;
 </script>
 </body>
 </html>
