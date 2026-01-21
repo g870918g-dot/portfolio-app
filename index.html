@@ -43,7 +43,6 @@ button,select{margin:4px;}
     圓餅圖色系：
     <select id="colorScheme" onchange="updateChartColors()">
       <option value="black">黑色系</option>
-      <option value="blue">藍色系</option>
     </select>
 
   </div>
@@ -62,33 +61,38 @@ const FINNHUB_KEY = "d5ofc59r01qjast6ddl0d5ofc59r01qjast6ddlg"; // <-- 放你的
 
 const colorSchemes = {
   black: ["#212121","#424242","#616161","#9E9E9E","#757575","#BDBDBD"]
-  blue: ["＃4682B4","＃4169E1","＃000080","＃1E90FF","＃7B68EE","＃483D8B"
 };
 
-// ————— 讀取 / 儲存 —————
+// ————— 儲存 / 讀取 localStorage —————
 function saveHoldings(){
-  const table=document.getElementById("holdings");
-  const data=[];
+  const table = document.getElementById("holdings");
+  const data = [];
   for(let i=1;i<table.rows.length;i++){
-    const r=table.rows[i];
-    data.push({
-      symbol: r.cells[0].children[0].value.toUpperCase(),
-      shares: Number(r.cells[1].children[0].value)
-    });
+    const r = table.rows[i];
+    const sym = r.cells[0].children[0].value.trim().toUpperCase();
+    const shares = Number(r.cells[1].children[0].value);
+    if(sym && shares >= 0){
+      data.push({symbol: sym, shares});
+    }
   }
-  localStorage.setItem("holdings",JSON.stringify(data));
+  localStorage.setItem("holdings", JSON.stringify(data));
 }
 
 function loadHoldings(){
-  const data=JSON.parse(localStorage.getItem("holdings")||"[]");
-  data.forEach(h=>addRow(h));
+  const data = JSON.parse(localStorage.getItem("holdings")||"[]");
+  data.forEach(h => addRow(h));
   updateExchangeRate();
   updatePrices();
-  setInterval(updatePrices, 2*60*60*1000);     // 每 2 小時更新美股價格
-  setInterval(updateExchangeRate, 24*60*60*1000); // 每 24 小時更新匯率
+  setInterval(updatePrices, 2*60*60*1000); // 每2小時更新美股價格
+  setInterval(updateExchangeRate, 24*60*60*1000); // 每24小時更新匯率
 }
 
-// ————— 建立一列 —————
+// ————— 判斷台股 —————
+function isTaiwanStock(symbol){
+  return /^\d+$/.test(symbol);
+}
+
+// ————— 新增行 —————
 function addRow(h=null){
   const table = document.getElementById("holdings");
   const row = table.insertRow();
@@ -99,71 +103,70 @@ function addRow(h=null){
     <td>0</td>
     <td>0</td>
   `;
-  
   if(h){
     row.cells[0].children[0].value = h.symbol;
     row.cells[1].children[0].value = h.shares;
   }
-
-  saveHoldings();      // 儲存目前持股
-  updatePrices();      // 抓價格並更新計算
+  saveHoldings();
+  updatePricesForRow(row); // 只更新新行，不影響舊行
 }
 
+// ————— 更新股價（整表） —————
+function updatePrices(){
+  const rows = document.querySelectorAll("#holdings tr");
+  for(let i=1;i<rows.length;i++){
+    updatePricesForRow(rows[i]);
+  }
+}
 
-// ————— 匯率抓取（USD→TWD） —————
+// ————— 更新單行股價 —————
+async function updatePricesForRow(row){
+  const sym = row.cells[0].children[0].value.trim().toUpperCase();
+  if(!sym) return;
+  try{
+    let price = 0;
+    if(isTaiwanStock(sym)){
+      const res = await fetch(`https://stock-quote-proxy.sukailin1124.workers.dev/quote?symbol=${sym}&market=tse`);
+      const data = await res.json();
+      price = data.price || 0;
+      row.cells[2].innerText = `${price.toFixed(2)} TWD`;
+    } else {
+      const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${sym}&token=${FINNHUB_KEY}`);
+      const data = await res.json();
+      price = data.c || 0;
+      row.cells[2].innerText = `${price.toFixed(2)} USD`;
+    }
+  }catch(e){
+    console.log("抓股價失敗：", e);
+    row.cells[2].innerText = "0";
+  }
+  calc(); // 計算總價與圓餅圖
+}
+
+// ————— 更新匯率 —————
 async function updateExchangeRate(){
   try{
-    const res=await fetch("https://api.exchangerate.host/latest?base=USD&symbols=TWD");
-    const data=await res.json();
+    const res = await fetch("https://api.exchangerate.host/latest?base=USD&symbols=TWD");
+    const data = await res.json();
     usdToTwd = data.rates.TWD;
     document.getElementById("exchangeRate").innerText = `1 USD = ${usdToTwd.toFixed(4)} TWD`;
     calc();
   }catch(e){console.log("匯率抓取失敗", e);}
 }
 
-// ————— 判斷是否台股 —————
-function isTaiwanStock(symbol){ return /^\d+$/.test(symbol); }
-
-// ————— 抓股價 —————
-async function updatePrices(){
-  const rows=document.querySelectorAll("#holdings tr");
-  for(let i=1;i<rows.length;i++){
-    const sym = rows[i].cells[0].children[0].value.trim().toUpperCase();
-    if(!sym) continue;
-    try{
-      let price=0;
-      if(isTaiwanStock(sym)){
-        const res=await fetch(`https://stock-quote-proxy.sukailin1124.workers.dev/quote?symbol=${sym}&market=tse`);
-        const data=await res.json();
-        price = data.price || 0;
-        rows[i].cells[2].innerText = `${price.toFixed(2)} TWD`;
-      } else {
-        const res=await fetch(`https://finnhub.io/api/v1/quote?symbol=${sym}&token=${FINNHUB_KEY}`);
-        const data=await res.json();
-        price = data.c || 0;
-        rows[i].cells[2].innerText = `${price.toFixed(2)} USD`;
-      }
-    }catch(e){
-      console.log("抓股價失敗：", e);
-      rows[i].cells[2].innerText = "0";
-    }
-  }
-  calc();
-}
-
 // ————— 計算總價與圓餅圖 —————
 function calc(){
-  const rows=document.querySelectorAll("#holdings tr");
-  const labels=[],dataArr=[]; 
-  let totalTWD=0;
+  const rows = document.querySelectorAll("#holdings tr");
+  const labels=[],dataArr=[];
+  let totalTWD = 0;
 
+  // 計算每行總價
   for(let i=1;i<rows.length;i++){
-    const shares=Number(rows[i].cells[1].children[0].value);
-    let rawPrice=0;
-    const priceText=rows[i].cells[2].innerText;
+    const shares = Number(rows[i].cells[1].children[0].value);
+    let rawPrice = 0;
+    const priceText = rows[i].cells[2].innerText;
     if(priceText.includes("USD")){
-      rawPrice = Number(priceText.replace(" USD",""));
-      rawPrice *= usdToTwd; // 換算成 TWD
+      rawPrice = Number(priceText.replace(" USD","")) * usdToTwd;
     } else {
       rawPrice = Number(priceText.replace(" TWD",""));
     }
@@ -172,21 +175,21 @@ function calc(){
     totalTWD += total;
   }
 
+  // 計算佔比 & 圓餅圖資料
   for(let i=1;i<rows.length;i++){
-    const shares=Number(rows[i].cells[1].children[0].value);
+    const shares = Number(rows[i].cells[1].children[0].value);
     const total = Number(rows[i].cells[3].innerText);
     const pct = totalTWD ? (total/totalTWD*100) : 0;
     rows[i].cells[4].innerText = pct.toFixed(2);
-
     if(shares > 0){
       labels.push(rows[i].cells[0].children[0].value.toUpperCase());
       dataArr.push(total);
     }
   }
 
-  const ctx=document.getElementById("chart");
+  const ctx = document.getElementById("chart");
   if(chart) chart.destroy();
-  chart=new Chart(ctx,{
+  chart = new Chart(ctx,{
     type:"pie",
     data:{labels,datasets:[{data:dataArr,backgroundColor:colorSchemes["black"]}]},
     options:{responsive:true}
@@ -197,7 +200,14 @@ function calc(){
 
 // ————— 色系切換 —————
 function updateChartColors(){
-  const scheme=document.getElementById("colorScheme").value;
+  const scheme = document.getElementById("colorScheme").value;
   if(chart){
-    chart.data
+    chart.data.datasets[0].backgroundColor = colorSchemes[scheme];
+    chart.update();
+  }
+}
 
+window.onload = loadHoldings;
+</script>
+</body>
+</html>
