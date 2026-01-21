@@ -7,9 +7,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
 body {
-  font-family: "Microsoft JhengHei", sans-serif;
-  margin: 0;
-  padding: 16px;
+  font-family: "Microsoft JhengHei","PingFang TC","Heiti TC",sans-serif;
 }
 .container{display:flex;gap:20px;flex-wrap:wrap;}
 table{border-collapse:collapse;width:100%;}
@@ -24,7 +22,7 @@ button,select{margin:4px;}
 <body>
 
 <h2>持股比例 App（總價顯示 TWD）</h2>
-<div id="exchangeRate">1 USD = 30 TWD</div>
+<div id="exchangeRate">
   1 USD = ... TWD
   <span id="totalAmount" style="margin-left:20px;font-weight:bold;">總金額: 0</span>
 </div>
@@ -155,10 +153,14 @@ async function updateExchangeRate(){
     const res = await fetch("https://api.exchangerate.host/latest?base=USD&symbols=TWD");
     const data = await res.json();
     usdToTwd = data.rates.TWD;
-    document.getElementById("exchangeRate").innerText = `1 USD = ${usdToTwd.toFixed(4)} TWD`;
+    document.getElementById("exchangeRate").innerHTML = 
+      `1 USD = ${usdToTwd.toFixed(4)} TWD <span id="totalAmount" style="margin-left:20px;font-weight:bold;">總金額: 0</span>`;
     calc();
-  }catch(e){console.log("匯率抓取失敗", e);}
+  } catch(e) {
+    console.log("匯率抓取失敗", e);
+  }
 }
+
 
 // —— 計算總價與圓餅圖 —
 function calc(){
@@ -252,6 +254,7 @@ window.onload=loadHoldings;
 </script>
 </body>
 </html>
+
 
 
 
