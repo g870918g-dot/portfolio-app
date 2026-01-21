@@ -29,6 +29,7 @@
     <th>股數</th>
     <th>股價 (USD)</th>
     <th>總價</th>
+    <th>佔比 (%)</th>
   </tr>
 </table>
 
@@ -47,7 +48,7 @@
 let chart;
 let usdToTwd = 30; // 初始匯率
 
-// 儲存與載入持股
+// 儲存持股股數和股票代碼（股價不儲存，直接抓）
 function saveHoldings() {
   const table = document.getElementById("holdings");
   const data = [];
@@ -55,8 +56,7 @@ function saveHoldings() {
     const r = table.rows[i];
     data.push({
       symbol: r.cells[0].children[0].value,
-      shares: Number(r.cells[1].children[0].value),
-      price: Number(r.cells[2].children[0].value)
+      shares: Number(r.cells[1].children[0].value)
     });
   }
   localStorage.setItem("holdings", JSON.stringify(data));
@@ -65,27 +65,28 @@ function saveHoldings() {
 function loadHoldings(){
   const data = JSON.parse(localStorage.getItem("holdings")||"[]");
   data.forEach(h => addRow(h));
-  calc();
+  updatePrices();
 }
 
+// 新增一列股票
 function addRow(h=null){
   const table = document.getElementById("holdings");
   const row = table.insertRow();
   row.innerHTML = `
     <td><input placeholder="2330 / AAPL"></td>
     <td><input type="number" value="0"></td>
-    <td><input type="number" value="0"></td>
+    <td>0</td>
+    <td>0</td>
     <td>0</td>
   `;
   if(h){
     row.cells[0].children[0].value = h.symbol;
     row.cells[1].children[0].value = h.shares;
-    row.cells[2].children[0].value = h.price;
   }
   saveHoldings();
 }
 
-// 抓取即時匯率 USD→TWD
+// 抓即時匯率 USD→TWD
 async function updateRate(){
   try{
     const res = await fetch('https://api.exchangerate.host/latest?base=USD&symbols=TWD');
@@ -98,18 +99,17 @@ async function updateRate(){
 
 // 批次抓股價
 async function updatePrices(){
-  await updateRate(); // 更新匯率
-
+  await updateRate();
   const rows = document.querySelectorAll("#holdings tr");
   const symbols = [];
   for(let i=1;i<rows.length;i++){
-    let symbol = rows[i].cells[0].children[0].value.trim();
-    if(symbol) symbols.push(symbol);
+    let s = rows[i].cells[0].children[0].value.trim();
+    if(s) symbols.push(s);
   }
   if(symbols.length === 0) return;
 
-  // 批次抓
-  const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbols.map(s=>s.replace(/\./g,"")).join(",")}`;
+  // Yahoo Finance 批次抓股價
+  const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbols.join(",")}`;
   try{
     const res = await fetch(url);
     const data = await res.json();
@@ -118,37 +118,52 @@ async function updatePrices(){
     for(let i=1;i<rows.length;i++){
       const symbol = rows[i].cells[0].children[0].value.trim();
       if(!symbol) continue;
-      const stock = results.find(s => s.symbol.toUpperCase().includes(symbol.replace(/\./g,"").toUpperCase()));
+      // 對應股價
+      const stock = results.find(s => s.symbol.toUpperCase() === symbol.toUpperCase() || s.symbol.toUpperCase().includes(symbol.replace(/\./g,"").toUpperCase()));
       if(stock?.regularMarketPrice){
-        rows[i].cells[2].children[0].value = stock.regularMarketPrice.toFixed(2);
+        rows[i].cells[2].innerText = stock.regularMarketPrice.toFixed(2);
+      }else{
+        rows[i].cells[2].innerText = "-";
       }
     }
   }catch(e){
-    console.log("股價更新失敗", e);
+    console.log("股價抓取失敗", e);
+    for(let i=1;i<rows.length;i++){
+      rows[i].cells[2].innerText = "-";
+    }
   }
-  saveHoldings();
   calc();
 }
 
-// 計算總價和畫圖
+// 計算總價、佔比及畫圖
 function calc(){
   const currency = document.getElementById("currency").value;
   const rows = document.querySelectorAll("#holdings tr");
   const labels = [];
-  const data = [];
+  const dataArr = [];
+  let totalSum = 0;
 
   for(let i=1;i<rows.length;i++){
     const shares = Number(rows[i].cells[1].children[0].value);
-    let price = Number(rows[i].cells[2].children[0].value);
+    let price = Number(rows[i].cells[2].innerText);
+    if(isNaN(price)) price = 0;
     if(currency==="TWD") price *= usdToTwd;
 
     const total = shares * price;
     rows[i].cells[3].innerText = total.toFixed(2);
+    totalSum += total;
 
     labels.push(rows[i].cells[0].children[0].value);
-    data.push(total);
+    dataArr.push(total);
   }
 
+  // 計算佔比
+  for(let i=1;i<rows.length;i++){
+    const pct = totalSum ? (dataArr[i-1]/totalSum*100) : 0;
+    rows[i].cells[4].innerText = pct.toFixed(2);
+  }
+
+  // 畫圓餅圖
   const ctx = document.getElementById("chart");
   if(chart) chart.destroy();
   chart = new Chart(ctx,{
@@ -156,7 +171,7 @@ function calc(){
     data:{
       labels: labels,
       datasets:[{
-        data: data,
+        data: dataArr,
         backgroundColor:["#FF6384","#36A2EB","#FFCE56","#4BC0C0","#9966FF","#FF9F40","#C9CBCF","#FF9FBF"]
       }]
     },
