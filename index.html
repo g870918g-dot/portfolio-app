@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>持股比例 App</title>
+<title>持股比例 App (Finnhub)</title>
 
 <link rel="manifest" href="manifest.json">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -25,7 +25,7 @@ canvas#historyChart{margin-top:20px;}
 </head>
 <body>
 
-<h2>持股比例 App</h2>
+<h2>持股比例 App (Finnhub)</h2>
 
 <div class="container">
   <div class="left">
@@ -54,8 +54,8 @@ canvas#historyChart{margin-top:20px;}
 
 <script>
 let chart, historyChart;
-let usdToTwd = 30;
-const FMP_KEY = "YOUR_FMP_KEY"; // <-- 填入你的 FMP API key
+let usdToTwd = 30;  // 可選擇換算匯率
+const FINNHUB_KEY = "d5ofc59r01qjast6ddl0d5ofc59r01qjast6ddlg"; // <-- 填入你的 Finnhub API key
 
 function saveHoldings(){
   const table = document.getElementById("holdings");
@@ -71,14 +71,14 @@ function loadHoldings(){
   const data = JSON.parse(localStorage.getItem("holdings")||"[]");
   data.forEach(h=>addRow(h));
   updatePrices();
-  setInterval(updatePrices, 120*60*1000); // 自動每兩小時更新
+  setInterval(updatePrices, 2*60*60*1000); // 每兩小時更新
 }
 
 function addRow(h=null){
   const table=document.getElementById("holdings");
   const row=table.insertRow();
   row.innerHTML=`
-    <td><input placeholder="AAPL / 2330"></td>
+    <td><input placeholder="AAPL / TSLA"></td>
     <td><input type="number" value="0"></td>
     <td>0</td>
     <td>0</td>
@@ -87,43 +87,23 @@ function addRow(h=null){
   `;
   if(h){row.cells[0].children[0].value=h.symbol; row.cells[1].children[0].value=h.shares;}
   saveHoldings();
-  updatePrices(); // 新增後立即抓股價
-}
-
-async function updateRate(){
-  try{
-    const res=await fetch('https://api.exchangerate.host/latest?base=USD&symbols=TWD');
-    const data=await res.json();
-    usdToTwd=data.rates.TWD;
-  }catch{}
-}
-
-function normalizeSymbol(sym){
-  if(/^\d{3,4}$/.test(sym)) return sym+".TW";
-  else if(/^[A-Za-z]+$/.test(sym)) return sym;
-  return sym;
+  updatePrices();
 }
 
 async function updatePrices(){
-  await updateRate();
   const rows=document.querySelectorAll("#holdings tr");
-  const symbols=[];
   for(let i=1;i<rows.length;i++){
-    const s=rows[i].cells[0].children[0].value.trim();
-    if(s) symbols.push(normalizeSymbol(s));
-  }
-  if(symbols.length===0) return;
-
-  const url=`https://financialmodelingprep.com/stable/batch-quote?symbols=${symbols.join(",")}?apikey=${FMP_KEY}`;
-  try{
-    const res=await fetch(url);
-    const data=await res.json();
-    for(let i=1;i<rows.length;i++){
-      const sym=normalizeSymbol(rows[i].cells[0].children[0].value.trim());
-      const stock=data.find(x=>x.symbol===sym);
-      rows[i].cells[2].innerText=stock?stock.price.toFixed(2):"0";
+    const sym=rows[i].cells[0].children[0].value.trim().toUpperCase();
+    if(!sym) continue;
+    try{
+      const res=await fetch(`https://finnhub.io/api/v1/quote?symbol=${sym}&token=${FINNHUB_KEY}`);
+      const data=await res.json();
+      rows[i].cells[2].innerText = data.c ? data.c.toFixed(2) : "0";
+    }catch(e){
+      console.log("抓股價錯誤:",e);
+      rows[i].cells[2].innerText="0";
     }
-  }catch(e){console.log(e);}
+  }
   calc();
 }
 
@@ -143,12 +123,13 @@ function calc(){
     totalSum+=total;
   }
 
-  // 計算佔比，只把股數>0加入圓餅圖
+  // 計算佔比，並只把股數>0加入圓餅圖
   for(let i=1;i<rows.length;i++){
     const shares=Number(rows[i].cells[1].children[0].value);
     const total=Number(rows[i].cells[3].innerText);
     const pct=totalSum?((total/totalSum)*100):0;
     rows[i].cells[4].innerText=pct.toFixed(2);
+
     if(shares>0){
       labels.push(rows[i].cells[0].children[0].value.toUpperCase());
       dataArr.push(total);
@@ -165,15 +146,14 @@ function calc(){
 
 async function showHistory(btn){
   const row=btn.parentElement.parentElement;
-  const sym=normalizeSymbol(row.cells[0].children[0].value.trim());
-  const histSym=sym.replace(".TW",""); // FMP台股
-  const url=`https://financialmodelingprep.com/api/v3/historical-price-full/${histSym}?serietype=line&apikey=${FMP_KEY}`;
+  const sym=row.cells[0].children[0].value.trim().toUpperCase();
+  if(!sym) return;
   try{
-    const res=await fetch(url);
+    const res=await fetch(`https://finnhub.io/api/v1/stock/candle?symbol=${sym}&resolution=D&count=30&token=${FINNHUB_KEY}`);
     const data=await res.json();
-    if(!data.historical) return alert("抓不到歷史資料");
-    const labels=data.historical.slice(0,30).map(d=>d.date).reverse();
-    const prices=data.historical.slice(0,30).map(d=>d.close).reverse();
+    if(data.s!=="ok") return alert("抓不到歷史資料");
+    const labels=data.t.map(ts=>new Date(ts*1000).toISOString().slice(0,10));
+    const prices=data.c;
     const ctx=document.getElementById("historyChart");
     if(historyChart) historyChart.destroy();
     historyChart=new Chart(ctx,{
@@ -188,4 +168,3 @@ window.onload=loadHoldings;
 </script>
 </body>
 </html>
-
