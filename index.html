@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Portfolio Ratio</title>
+<title>持股比例 App</title>
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json">
@@ -13,42 +13,52 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
-  body { font-family: system-ui; padding: 16px; }
+  body { font-family: system-ui; margin: 0; padding: 16px; }
+  .container { display: flex; gap: 20px; flex-wrap: wrap; }
   table { border-collapse: collapse; width: 100%; }
   th, td { border: 1px solid #aaa; padding: 6px; text-align: center; }
   input { width: 80px; }
   button { margin: 4px; }
+  .left { flex: 1 1 60%; }
+  .right { flex: 1 1 35%; max-width: 400px; }
 </style>
 </head>
 <body>
+
 <h2>持股比例 App</h2>
 
-<table id="holdings">
-  <tr>
-    <th>股票代碼</th>
-    <th>股數</th>
-    <th>股價 (USD)</th>
-    <th>總價</th>
-    <th>佔比 (%)</th>
-  </tr>
-</table>
+<div class="container">
+  <div class="left">
+    <table id="holdings">
+      <tr>
+        <th>股票代碼</th>
+        <th>股數</th>
+        <th>股價 (USD)</th>
+        <th>總價</th>
+        <th>佔比 (%)</th>
+      </tr>
+    </table>
 
-<br>
-<button onclick="addRow()">新增持股</button>
-<button onclick="updatePrices()">更新股價</button>
-<select id="currency" onchange="calc()">
-  <option value="USD">USD</option>
-  <option value="TWD">TWD</option>
-</select>
-<span>選擇幣別</span>
+    <button onclick="addRow()">新增持股</button>
+    <button onclick="updatePrices()">更新股價</button>
+    <select id="currency" onchange="calc()">
+      <option value="USD">USD</option>
+      <option value="TWD">TWD</option>
+    </select>
+    <span>選擇幣別</span>
+  </div>
 
-<canvas id="chart" width="300"></canvas>
+  <div class="right">
+    <canvas id="chart"></canvas>
+  </div>
+</div>
 
 <script>
 let chart;
 let usdToTwd = 30; // 初始匯率
+const FINNHUB_KEY = "請替換成你的API_KEY"; // <-- 申請 Finnhub API key
 
-// 儲存持股股數和股票代碼（股價不儲存，直接抓）
+// 儲存持股股數與股票代碼
 function saveHoldings() {
   const table = document.getElementById("holdings");
   const data = [];
@@ -68,12 +78,11 @@ function loadHoldings(){
   updatePrices();
 }
 
-// 新增一列股票
 function addRow(h=null){
   const table = document.getElementById("holdings");
   const row = table.insertRow();
   row.innerHTML = `
-    <td><input placeholder="2330 / AAPL"></td>
+    <td><input placeholder="2330.TW / AAPL"></td>
     <td><input type="number" value="0"></td>
     <td>0</td>
     <td>0</td>
@@ -86,7 +95,7 @@ function addRow(h=null){
   saveHoldings();
 }
 
-// 抓即時匯率 USD→TWD
+// 取得 USD → TWD 匯率
 async function updateRate(){
   try{
     const res = await fetch('https://api.exchangerate.host/latest?base=USD&symbols=TWD');
@@ -97,45 +106,33 @@ async function updateRate(){
   }
 }
 
-// 批次抓股價
+// 批次抓股價（Finnhub）
 async function updatePrices(){
   await updateRate();
   const rows = document.querySelectorAll("#holdings tr");
-  const symbols = [];
   for(let i=1;i<rows.length;i++){
-    let s = rows[i].cells[0].children[0].value.trim();
-    if(s) symbols.push(s);
-  }
-  if(symbols.length === 0) return;
+    const symbol = rows[i].cells[0].children[0].value.trim();
+    if(!symbol) continue;
 
-  // Yahoo Finance 批次抓股價
-  const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbols.join(",")}`;
-  try{
-    const res = await fetch(url);
-    const data = await res.json();
-    const results = data.quoteResponse.result;
-
-    for(let i=1;i<rows.length;i++){
-      const symbol = rows[i].cells[0].children[0].value.trim();
-      if(!symbol) continue;
-      // 對應股價
-      const stock = results.find(s => s.symbol.toUpperCase() === symbol.toUpperCase() || s.symbol.toUpperCase().includes(symbol.replace(/\./g,"").toUpperCase()));
-      if(stock?.regularMarketPrice){
-        rows[i].cells[2].innerText = stock.regularMarketPrice.toFixed(2);
+    // Finnhub API 取得即時價格
+    const url = `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${FINNHUB_KEY}`;
+    try{
+      const res = await fetch(url);
+      const data = await res.json();
+      if(data.c){ // c = current price
+        rows[i].cells[2].innerText = data.c.toFixed(2);
       }else{
         rows[i].cells[2].innerText = "-";
       }
-    }
-  }catch(e){
-    console.log("股價抓取失敗", e);
-    for(let i=1;i<rows.length;i++){
+    }catch(e){
+      console.log(`股價抓取失敗: ${symbol}`, e);
       rows[i].cells[2].innerText = "-";
     }
   }
   calc();
 }
 
-// 計算總價、佔比及畫圖
+// 計算總價與佔比
 function calc(){
   const currency = document.getElementById("currency").value;
   const rows = document.querySelectorAll("#holdings tr");
@@ -157,13 +154,12 @@ function calc(){
     dataArr.push(total);
   }
 
-  // 計算佔比
   for(let i=1;i<rows.length;i++){
     const pct = totalSum ? (dataArr[i-1]/totalSum*100) : 0;
     rows[i].cells[4].innerText = pct.toFixed(2);
   }
 
-  // 畫圓餅圖
+  // 圓餅圖
   const ctx = document.getElementById("chart");
   if(chart) chart.destroy();
   chart = new Chart(ctx,{
