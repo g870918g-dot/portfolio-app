@@ -6,17 +6,67 @@
 <title>持股比例 App</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
+/* 字體設定 */
 body {
   font-family: "Microsoft JhengHei","PingFang TC","Heiti TC",sans-serif;
+  margin: 0;
+  padding: 16px;
 }
-.container{display:flex;gap:20px;flex-wrap:wrap;}
-table{border-collapse:collapse;width:100%;}
-th,td{border:1px solid #aaa;padding:6px;text-align:center;}
-input{width:80px;}
-button,select{margin:4px;}
-.left{flex:1 1 60%;}
-.right{flex:1 1 35%;max-width:400px;}
-#exchangeRate{font-weight:bold;margin-bottom:8px;}
+
+/* 容器自適應 */
+.container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+.left {
+  flex: 1 1 100%;
+}
+.right {
+  flex: 1 1 100%;
+  max-width: 100%;
+  margin-top: 20px;
+}
+@media(min-width:768px){
+  .left { flex:1 1 60%; }
+  .right { flex:1 1 35%; max-width:400px; margin-top:0; }
+}
+
+/* 表格樣式 */
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 14px;
+}
+th, td {
+  border: 1px solid #aaa;
+  padding: 8px;
+  text-align: center;
+  word-break: break-word;
+}
+input {
+  width: 70px;
+  font-size: 14px;
+}
+button, select {
+  margin: 4px 2px;
+  font-size: 14px;
+}
+
+/* 手機按鈕並排 */
+@media(max-width:480px){
+  button, select {
+    width: 48%;
+    margin:4px 1%;
+  }
+}
+
+/* 匯率顯示 */
+#exchangeRate {
+  font-weight:bold;
+  margin-bottom:12px;
+  font-size:14px;
+}
 </style>
 </head>
 <body>
@@ -26,6 +76,7 @@ button,select{margin:4px;}
   1 USD = ... TWD
   <span id="totalAmount" style="margin-left:20px;font-weight:bold;">總金額: 0</span>
 </div>
+
 <div class="container">
   <div class="left">
     <table id="holdings">
@@ -37,7 +88,6 @@ button,select{margin:4px;}
         <th>佔比 (%)</th>
       </tr>
     </table>
-
     <button onclick="addRow()">新增持股</button>
     <button onclick="updatePrices()">更新股價</button>
     <br>
@@ -56,8 +106,8 @@ button,select{margin:4px;}
 // —— 全局變數 ——
 let chart;
 let usdToTwd = 30;
-const FINNHUB_KEY = "d5ofc59r01qjast6ddl0d5ofc59r01qjast6ddlg";   // 替換成你的Finnhub Key
-const FINMIND_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNi0wMS0yMiAwMjowMzo1MyIsInVzZXJfaWQiOiJnODcwOTE4ZyIsImVtYWlsIjoiZzg3MDkxOGdAZ21haWwuY29tIiwiaXAiOiI2MS4yMzAuMzcuMzEifQ.sunKX_jHdSZAmXUMztvTVOjm9ZCZYNN_xm1fm-Xi7aE"; // 替換成你的FinMind Token
+const FINNHUB_KEY = "d5ofc59r01qjast6ddl0d5ofc59r01qjast6ddlg";  
+const FINMIND_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNi0wMS0yMiAwMjowMzo1MyIsInVzZXJfaWQiOiJnODcwOTE4ZyIsImVtYWlsIjoiZzg3MDkxOGdAZ21haWwuY29tIiwiaXAiOiI2MS4yMzAuMzcuMzEifQ.sunKX_jHdSZAmXUMztvTVOjm9ZCZYNN_xm1fm-Xi7aE"; 
 const warmColors = ["#FF6F61","#FFA07A","#FF8C00","#FFD700","#FFB347","#FF7F50"];
 const coolColors = ["#6495ED","#00CED1","#20B2AA","#4682B4","#1E90FF","#00BFFF"];
 const othersColor = "#A9A9A9";
@@ -119,13 +169,12 @@ function addRow(h=null){
 // —— 更新整表股價 —— 改成等待所有 fetch 完成
 async function updatePrices(){
   const rows = Array.from(document.querySelectorAll("#holdings tr")).slice(1);
-  // 建立一個 Promise array
   const promises = rows.map(row => updatePricesForRow(row));
   await Promise.all(promises);
   sortTableByTotal();
 }
 
-// —— 更新單行股價 —— 改成回傳 Promise
+// —— 更新單行股價 —— 回傳 Promise
 async function updatePricesForRow(row){
   const sym = row.cells[0].children[0].value.trim().toUpperCase();
   if(!sym) return;
@@ -156,11 +205,8 @@ async function updateExchangeRate(){
     document.getElementById("exchangeRate").innerHTML = 
       `1 USD = ${usdToTwd.toFixed(4)} TWD <span id="totalAmount" style="margin-left:20px;font-weight:bold;">總金額: 0</span>`;
     calc();
-  } catch(e) {
-    console.log("匯率抓取失敗", e);
-  }
+  }catch(e){console.log("匯率抓取失敗", e);}
 }
-
 
 // —— 計算總價與圓餅圖 —
 function calc(){
@@ -173,26 +219,24 @@ function calc(){
     if(priceText.includes("USD")) rawPrice = Number(priceText.replace(" USD",""))*usdToTwd;
     else rawPrice = Number(priceText.replace(" TWD",""));
     const total = shares*rawPrice;
-    // ✅ 四捨五入 + 千位逗號
     rows[i].cells[3].innerText = total?total.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ","):"0";
     totalTWD += total;
-    document.getElementById("totalAmount").innerText = 
-  `總金額: ${totalTWD.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ",")} TWD`;
-
   }
+
+  document.getElementById("totalAmount").innerText = 
+    `總金額: ${totalTWD.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ",")} TWD`;
 
   let stockTotals = [];
   for(let i=1;i<rows.length;i++){
     const shares = Number(rows[i].cells[1].children[0].value);
     if(shares<=0) continue;
-    const total = Number(rows[i].cells[3].innerText.replace(/,/g,'')); // 去掉逗號再計算
+    const total = Number(rows[i].cells[3].innerText.replace(/,/g,'')); 
     const sym = rows[i].cells[0].children[0].value.toUpperCase();
     stockTotals.push({symbol:sym,total,isTW:isTaiwanStock(sym)});
-    // ✅ 百分比保留小數點一位
     rows[i].cells[4].innerText = totalTWD?((total/totalTWD)*100).toFixed(1):0;
   }
 
-  // 以下圓餅圖邏輯不變
+  // 圓餅圖邏輯
   let chartDataLabels=[];
   let chartDataValues=[];
   let chartDataColors=[];
@@ -223,7 +267,7 @@ function calc(){
         const label = context.label||'';
         const value = context.parsed;
         const total = chartDataValues.reduce((a,b)=>a+b,0);
-        const pct = total?(value/total*100).toFixed(1):0; // ✅ 小數點一位
+        const pct = total?(value/total*100).toFixed(1):0; 
         return `${label}: ${pct}%`;
       }}}}
     }
@@ -232,12 +276,11 @@ function calc(){
   saveHoldings();
 }
 
-
 // —— 表格依總價重新排序 —
 function sortTableByTotal(){
   const table=document.getElementById("holdings");
   const rows=Array.from(table.rows).slice(1);
-  rows.sort((a,b)=>Number(b.cells[3].innerText)-Number(a.cells[3].innerText));
+  rows.sort((a,b)=>Number(b.cells[3].innerText.replace(/,/g,''))-Number(a.cells[3].innerText.replace(/,/g,'')));
   rows.forEach(r=>table.appendChild(r));
 }
 
@@ -254,7 +297,3 @@ window.onload=loadHoldings;
 </script>
 </body>
 </html>
-
-
-
-
