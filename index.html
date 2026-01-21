@@ -58,6 +58,7 @@ button,select{margin:4px;}
 let chart;
 let usdToTwd = 30; 
 const FINNHUB_KEY = "d5ofc59r01qjast6ddl0d5ofc59r01qjast6ddlg"; // <-- 放你的 Finnhub Key
+const FINMIND_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNi0wMS0yMiAwMjowMzo1MyIsInVzZXJfaWQiOiJnODcwOTE4ZyIsImVtYWlsIjoiZzg3MDkxOGdAZ21haWwuY29tIiwiaXAiOiI2MS4yMzAuMzcuMzEifQ.sunKX_jHdSZAmXUMztvTVOjm9ZCZYNN_xm1fm-Xi7aE"; // <-- 放你的 FinMind Token
 
 // 台股暖色系 / 美股冷色系 / 其他顏色
 const warmColors = ["#FF6F61","#FFA07A","#FF8C00","#FFD700","#FFB347","#FF7F50"];
@@ -90,7 +91,7 @@ function loadHoldings(){
 
 // ————— 判斷台股 —————
 function isTaiwanStock(symbol){
-  return /^\d+$/.test(symbol);
+  return /^\d+$/.test(symbol) || /^00\d{3}[LR]?$/.test(symbol); // 包含ETF
 }
 
 // ————— 新增行 —————
@@ -109,7 +110,7 @@ function addRow(h=null){
     row.cells[1].children[0].value = h.shares;
   }
   saveHoldings();
-  updatePricesForRow(row); // 只更新新行，不影響舊行
+  updatePricesForRow(row);
 }
 
 // ————— 更新股價（整表） —————
@@ -127,16 +128,20 @@ async function updatePricesForRow(row){
   try{
     let price = 0;
     if(isTaiwanStock(sym)){
-  try {
-    const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${sym}.TW`);
-    const data = await res.json();
-    price = data.chart.result[0].meta.regularMarketPrice || 0;
-    row.cells[2].innerText = `${price.toFixed(2)} TWD`;
-  } catch(e){
-    console.log("抓台股價格失敗", e);
-    row.cells[2].innerText = "0";
-  }
-} else {
+      // FinMind API抓台股收盤價
+      const today = new Date();
+      const yyyy = today.getFullYear();
+      const mm = String(today.getMonth()+1).padStart(2,'0');
+      const dd = String(today.getDate()).padStart(2,'0');
+      const dateStr = `${yyyy}-${mm}-${dd}`;
+      const res = await fetch(`https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPrice&data_id=${sym}&start_date=${dateStr}&end_date=${dateStr}&token=${FINMIND_TOKEN}`);
+      const data = await res.json();
+      if(data.data && data.data.length>0){
+        price = data.data[0].close;
+      }
+      row.cells[2].innerText = `${price.toFixed(2)} TWD`;
+    } else {
+      // 美股
       const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${sym}&token=${FINNHUB_KEY}`);
       const data = await res.json();
       price = data.c || 0;
@@ -146,7 +151,7 @@ async function updatePricesForRow(row){
     console.log("抓股價失敗：", e);
     row.cells[2].innerText = "0";
   }
-  calc(); // 計算總價與圓餅圖
+  calc();
 }
 
 // ————— 更新匯率 —————
@@ -165,7 +170,6 @@ function calc(){
   const rows = document.querySelectorAll("#holdings tr");
   let totalTWD = 0;
 
-  // 計算每行總價
   for(let i=1;i<rows.length;i++){
     const shares = Number(rows[i].cells[1].children[0].value);
     let rawPrice = 0;
@@ -180,7 +184,6 @@ function calc(){
     totalTWD += total;
   }
 
-  // 計算佔比 & 圓餅圖
   let stockTotals = [];
   for(let i=1;i<rows.length;i++){
     const shares = Number(rows[i].cells[1].children[0].value);
@@ -245,7 +248,7 @@ function calc(){
 function updateChartColors(){
   const scheme = document.getElementById("colorScheme").value;
   if(chart){
-    chart.data.datasets[0].backgroundColor = colorSchemes[scheme];
+    chart.data.datasets[0].backgroundColor = scheme=="black" ? [...warmColors,...coolColors] : chart.data.datasets[0].backgroundColor;
     chart.update();
   }
 }
@@ -255,4 +258,3 @@ window.onload = loadHoldings;
 </script>
 </body>
 </html>
-
