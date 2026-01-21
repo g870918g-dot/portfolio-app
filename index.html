@@ -6,7 +6,11 @@
 <title>持股比例 App</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
-body{font-family:system-ui;margin:0;padding:16px;}
+body {
+  font-family: "Microsoft JhengHei", sans-serif;
+  margin: 0;
+  padding: 16px;
+}
 .container{display:flex;gap:20px;flex-wrap:wrap;}
 table{border-collapse:collapse;width:100%;}
 th,td{border:1px solid #aaa;padding:6px;text-align:center;}
@@ -20,15 +24,17 @@ button,select{margin:4px;}
 <body>
 
 <h2>持股比例 App（總價顯示 TWD）</h2>
-<div id="exchangeRate">1 USD = ... TWD</div>
-
+<div id="exchangeRate">1 USD = 30 TWD</div>
+  1 USD = ... TWD
+  <span id="totalAmount" style="margin-left:20px;font-weight:bold;">總金額: 0</span>
+</div>
 <div class="container">
   <div class="left">
     <table id="holdings">
       <tr>
         <th>股票代碼</th>
         <th>股數</th>
-        <th>股價（顯示幣別）</th>
+        <th>股價</th>
         <th>總價（TWD）</th>
         <th>佔比 (%)</th>
       </tr>
@@ -168,6 +174,9 @@ function calc(){
     // ✅ 四捨五入 + 千位逗號
     rows[i].cells[3].innerText = total?total.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ","):"0";
     totalTWD += total;
+    document.getElementById("totalAmount").innerText = 
+  `總金額: ${totalTWD.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ",")} TWD`;
+
   }
 
   let stockTotals = [];
@@ -243,5 +252,6 @@ window.onload=loadHoldings;
 </script>
 </body>
 </html>
+
 
 
