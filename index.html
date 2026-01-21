@@ -4,11 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>持股比例 App</title>
+
 <link rel="manifest" href="manifest.json">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Portfolio">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <style>
 body{font-family:system-ui;margin:0;padding:16px;}
 .container{display:flex;gap:20px;flex-wrap:wrap;}
@@ -22,68 +25,77 @@ button,select{margin:4px;}
 </style>
 </head>
 <body>
-<h2>持股比例 App (USD→TWD)</h2>
+
+<h2>持股比例 App（總價顯示 TWD）</h2>
 <div id="exchangeRate">1 USD = ... TWD</div>
+
 <div class="container">
   <div class="left">
     <table id="holdings">
       <tr>
         <th>股票代碼</th>
         <th>股數</th>
-        <th>股價 (USD)</th>
-        <th>總價 (USD)</th>
+        <th>股價（顯示幣別）</th>
+        <th>總價（TWD）</th>
         <th>佔比 (%)</th>
       </tr>
     </table>
+
     <button onclick="addRow()">新增持股</button>
     <button onclick="updatePrices()">更新股價</button>
     <br>
+
     圓餅圖色系：
     <select id="colorScheme" onchange="updateChartColors()">
-      <option value="bright">亮色系</option>
-      <option value="pastel">柔和粉彩</option>
-      <option value="dark">深色系</option>
-      <option value="ocean">藍綠海洋系</option>
+      <option value="black">黑色系</option>
     </select>
+
   </div>
+
   <div class="right">
     <canvas id="chart"></canvas>
   </div>
 </div>
 
 <script>
-let chart;
-const FINNHUB_KEY = "d5ofc59r01qjast6ddl0d5ofc59r01qjast6ddlg"; // <-- 填入你的 Finnhub API key
-const TWD_API = "https://api.exchangerate.host/latest?base=USD&symbols=TWD";
 
+// ————— 全局變數 —————
+let chart;
+let usdToTwd = 30; 
+const FINNHUB_KEY = "你的FinnhubKey"; // <-- 放你的 Finnhub Key
+
+// 圓餅圖黑色系
 const colorSchemes = {
-  bright:["#FF6384","#36A2EB","#FFCE56","#4BC0C0","#9966FF","#FF9F40"],
-  pastel:["#FFB3BA","#BAE1FF","#BAFFC9","#FFFFBA","#FFDFBA","#E0BAFF"],
-  dark:["#D32F2F","#1976D2","#388E3C","#FBC02D","#7B1FA2","#F57C00"],
-  ocean:["#00A8E8","#007EA7","#00B4D8","#48CAE4","#90E0EF","#CAF0F8"]
+  black: [
+    "#212121", "#424242", "#616161",
+    "#9E9E9E", "#757575", "#BDBDBD"
+  ]
 };
 
-let usdToTwd = 30; // 預設匯率
-
+// ————— 讀取 / 儲存 —————
 function saveHoldings(){
-  const table = document.getElementById("holdings");
-  const data = [];
+  const table=document.getElementById("holdings");
+  const data=[];
   for(let i=1;i<table.rows.length;i++){
     const r=table.rows[i];
-    data.push({symbol:r.cells[0].children[0].value.toUpperCase(),shares:Number(r.cells[1].children[0].value)});
+    data.push({
+      symbol: r.cells[0].children[0].value.toUpperCase(),
+      shares: Number(r.cells[1].children[0].value)
+    });
   }
   localStorage.setItem("holdings",JSON.stringify(data));
 }
 
 function loadHoldings(){
-  const data = JSON.parse(localStorage.getItem("holdings")||"[]");
+  const data=JSON.parse(localStorage.getItem("holdings")||"[]");
   data.forEach(h=>addRow(h));
   updateExchangeRate();
   updatePrices();
-  setInterval(updatePrices, 2*60*60*1000); // 美股每兩小時更新
-  setInterval(updateExchangeRate, 24*60*60*1000); // 匯率每天更新
+  setInterval(updatePrices, 2*60*60*1000);     // 每 2 小時更新美股價格
+  setInterval(updateExchangeRate, 24*60*60*1000); // 每 24 小時更新匯率
 }
 
+// ————— 建立一列 —————
 function addRow(h=null){
   const table=document.getElementById("holdings");
   const row=table.insertRow();
@@ -94,24 +106,31 @@ function addRow(h=null){
     <td>0</td>
     <td>0</td>
   `;
-  if(h){row.cells[0].children[0].value=h.symbol; row.cells[1].children[0].value=h.shares;}
+  if(h){
+    row.cells[0].children[0].value=h.symbol;
+    row.cells[1].children[0].value=h.shares;
+  }
   saveHoldings();
   updatePrices();
 }
 
+// ————— 匯率抓取（USD→TWD） —————
 async function updateExchangeRate(){
   try{
-    const res = await fetch(TWD_API);
-    const data = await res.json();
+    const res=await fetch("https://api.exchangerate.host/latest?base=USD&symbols=TWD");
+    const data=await res.json();
     usdToTwd = data.rates.TWD;
-    document.getElementById("exchangeRate").innerText = `1 USD = ${usdToTwd.toFixed(2)} TWD`;
+    document.getElementById("exchangeRate").innerText = `1 USD = ${usdToTwd.toFixed(4)} TWD`;
     calc();
-  }catch(e){console.log("匯率抓取錯誤",e);}
+  }catch(e){console.log("匯率抓取失敗", e);}
 }
 
-// 判斷是台股還是美股
-function isTaiwanStock(symbol){ return /^\d+$/.test(symbol); }
+// ————— 判斷是否台股 —————
+function isTaiwanStock(symbol){
+  return /^\d+$/.test(symbol);
+}
 
+// ————— 抓股價 —————
 async function updatePrices(){
   const rows=document.querySelectorAll("#holdings tr");
   for(let i=1;i<rows.length;i++){
@@ -120,63 +139,83 @@ async function updatePrices(){
     try{
       let price=0;
       if(isTaiwanStock(sym)){
-        // 台股抓前一天收盤價
-        const res = await fetch(`https://stock-quote-proxy.sukailin1124.workers.dev/quote?symbol=${sym}&market=tse`);
-        const data = await res.json();
+        // 台股：proxy 抓前一天收盤價
+        const res=await fetch(`https://stock-quote-proxy.sukailin1124.workers.dev/quote?symbol=${sym}&market=tse`);
+        const data=await res.json();
         price = data.price || 0;
+        rows[i].cells[2].innerText = `${price.toFixed(2)} TWD`;
       } else {
-        // 美股 Finnhub
-        const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${sym}&token=${FINNHUB_KEY}`);
-        const data = await res.json();
+        // 美股：Finnhub
+        const res=await fetch(`https://finnhub.io/api/v1/quote?symbol=${sym}&token=${FINNHUB_KEY}`);
+        const data=await res.json();
         price = data.c || 0;
+        rows[i].cells[2].innerText = `${price.toFixed(2)} USD`;
       }
-      rows[i].cells[2].innerText = price.toFixed(2);
-    }catch(e){console.log("抓股價錯誤:",e); rows[i].cells[2].innerText="0";}
+    }catch(e){
+      console.log("抓股價失敗：", e);
+      rows[i].cells[2].innerText = "0";
+      price = 0;
+    }
   }
   calc();
 }
 
+// ————— 計算總價與圓餅圖 —————
 function calc(){
   const rows=document.querySelectorAll("#holdings tr");
-  const labels=[],dataArr=[];
-  let totalSum=0;
+  const labels=[],dataArr=[]; 
+  let totalTWD=0;
+
+  // 先計算總價
   for(let i=1;i<rows.length;i++){
-    const shares = Number(rows[i].cells[1].children[0].value);
-    let price = Number(rows[i].cells[2].innerText);
-    // 統一換算成 USD
-    if(isTaiwanStock(rows[i].cells[0].children[0].value.trim())){
-      price = price / usdToTwd;
-      rows[i].cells[2].innerText = price.toFixed(2);
+    const shares=Number(rows[i].cells[1].children[0].value);
+    let rawPrice=0;
+    const priceText=rows[i].cells[2].innerText;
+    if(priceText.includes("USD")){
+      rawPrice = Number(priceText.replace(" USD",""));
+      rawPrice *= usdToTwd; // 換算成 TWD
+    } else {
+      rawPrice = Number(priceText.replace(" TWD",""));
     }
-    const total = shares * price;
+    const total = shares * rawPrice;
     rows[i].cells[3].innerText = total.toFixed(2);
-    totalSum += total;
+    totalTWD += total;
   }
+
+  // 佔比 & 圓餅圖資料
   for(let i=1;i<rows.length;i++){
+    const shares=Number(rows[i].cells[1].children[0].value);
     const total = Number(rows[i].cells[3].innerText);
-    const pct = totalSum ? (total/totalSum*100) : 0;
+    const pct = totalTWD ? (total/totalTWD*100) : 0;
     rows[i].cells[4].innerText = pct.toFixed(2);
-    if(Number(rows[i].cells[1].children[0].value) > 0){
+
+    if(shares > 0){
       labels.push(rows[i].cells[0].children[0].value.toUpperCase());
       dataArr.push(total);
     }
   }
+
   const ctx=document.getElementById("chart");
   if(chart) chart.destroy();
   chart=new Chart(ctx,{
     type:"pie",
-    data:{labels,datasets:[{data:dataArr,backgroundColor:colorSchemes["bright"]}]},
+    data:{labels,datasets:[{data:dataArr,backgroundColor:colorSchemes["black"]}]},
     options:{responsive:true}
   });
+
+  saveHoldings();
 }
 
+// ————— 色系切換 —————
 function updateChartColors(){
-  const scheme = document.getElementById("colorScheme").value;
-  if(chart) chart.data.datasets[0].backgroundColor = colorSchemes[scheme];
-  if(chart) chart.update();
+  const scheme=document.getElementById("colorScheme").value;
+  if(chart){
+    chart.data.datasets[0].backgroundColor = colorSchemes[scheme];
+    chart.update();
+  }
 }
 
-window.onload = loadHoldings;
+window.onload=loadHoldings;
 </script>
 </body>
 </html>
