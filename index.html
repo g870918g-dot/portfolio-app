@@ -200,6 +200,7 @@ async function updatePrices(){
   const rows = Array.from(document.querySelectorAll("#holdings tr")).slice(1);
   const promises = rows.map(row => updatePricesForRow(row));
   await Promise.all(promises);
+  calc(); 
   sortTableByTotal();
 }
 
@@ -222,7 +223,6 @@ async function updatePricesForRow(row){
       row.cells[2].innerText = `${price.toFixed(2)} USD`;
     }
   } catch(e){ console.log("抓股價失敗",e); row.cells[2].innerText="0"; }
-  calc();
 }
 
 // —— 更新匯率 —
@@ -326,3 +326,4 @@ window.onload=loadHoldings;
 </script>
 </body>
 </html>
+
