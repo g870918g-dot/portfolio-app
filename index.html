@@ -83,11 +83,11 @@ button, select {
   }
 
   /* 各欄位寬度控制 */
-  th:nth-child(1), td:nth-child(1) { width: 20%; } /* 股票代碼 */
+  th:nth-child(1), td:nth-child(1) { width: 15%; } /* 股票代碼 */
   th:nth-child(2), td:nth-child(2) { width: 15%; } /* 股數 */
   th:nth-child(3), td:nth-child(3) { width: 20%; } /* 股價 */
-  th:nth-child(4), td:nth-child(4) { width: 25%; } /* 總價 */
-  th:nth-child(5), td:nth-child(5) { width: 20%; } /* 佔比 */
+  th:nth-child(4), td:nth-child(4) { width: 27%; } /* 總價 */
+  th:nth-child(5), td:nth-child(5) { width: 23%; } /* 佔比 */
 
   /* input 縮小 */
   input {
@@ -100,9 +100,9 @@ button, select {
 </head>
 <body>
 
-<h2>持股比例 App（總價顯示 TWD）</h2>
+<h2>持股比例</h2>
 <div id="exchangeRate">
-  1 USD = ... TWD
+  1 USD = 30 TWD
   <span id="totalAmount" style="margin-left:20px;font-weight:bold;">總金額: 0</span>
 </div>
 
@@ -117,13 +117,8 @@ button, select {
         <th>佔比 (%)</th>
       </tr>
     </table>
-    <button onclick="addRow()">新增持股</button>
-    <button onclick="updatePrices()">更新股價</button>
-    <br>
-    圓餅圖色系：
-    <select id="colorScheme" onchange="updateChartColors()">
-      <option value="black">黑色系</option>
-    </select>
+    <button onclick="addRow()">新增</button>
+    <button onclick="updatePrices()">更新</button>
   </div>
 
   <div class="right">
@@ -132,17 +127,13 @@ button, select {
 </div>
 
 <script>
- let usdToTwd = 30;
-const FX_KEY = "USD_TWD_RATE";
-const FX_DATE_KEY = "USD_TWD_DATE";
-
 // —— 全局變數 ——
 let chart;
 let usdToTwd = 30;
 const FINNHUB_KEY = "d5ofc59r01qjast6ddl0d5ofc59r01qjast6ddlg";  
 const FINMIND_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNi0wMS0yMiAwMjowMzo1MyIsInVzZXJfaWQiOiJnODcwOTE4ZyIsImVtYWlsIjoiZzg3MDkxOGdAZ21haWwuY29tIiwiaXAiOiI2MS4yMzAuMzcuMzEifQ.sunKX_jHdSZAmXUMztvTVOjm9ZCZYNN_xm1fm-Xi7aE"; 
-const warmColors = ["#FF6F61","#FFA07A","#FF8C00","#FFD700","#FFB347","#FF7F50"];
-const coolColors = ["#6495ED","#00CED1","#20B2AA","#4682B4","#1E90FF","#00BFFF"];
+const warmColors = ["#A23400","#BB5E00","#AE8F00	","#C07AB8","#AD5A5A","#CE0000"];
+const coolColors = ["#28004D","#003060","#005757","#6F00D2","#2828FF","#00AEAE"];
 const othersColor = "#A9A9A9";
 
 // —— localStorage 儲存 / 讀取 —
@@ -229,79 +220,17 @@ async function updatePricesForRow(row){
   } catch(e){ console.log("抓股價失敗",e); row.cells[2].innerText="0"; }
 }
 
-async function updateExchangeRateIfNeeded(){
-  const rateSpan = document.getElementById("exchangeRate");
-  if(!rateSpan) return; // 保命
-
-  const today = new Date().toISOString().slice(0,10);
-  const savedDate = localStorage.getItem(FX_DATE_KEY);
-  const savedRate = localStorage.getItem(FX_KEY);
-
-  if(savedDate === today && savedRate){
-    usdToTwd = Number(savedRate);
-    rateSpan.childNodes[0].textContent = `1 USD = ${usdToTwd.toFixed(4)} TWD `;
-    return;
-  }
-
+// —— 更新匯率 —
+async function updateExchangeRate(){
   try{
-    const res = await fetch("https://cdn.moneyconvert.net/api/latest.json");
+    const res = await fetch("https://api.exchangerate.host/latest?base=USD&symbols=TWD");
     const data = await res.json();
-    if(!data?.rates?.TWD) throw "no rate";
-
-    usdToTwd = Number(data.rates.TWD);
-    localStorage.setItem(FX_KEY, usdToTwd);
-    localStorage.setItem(FX_DATE_KEY, today);
-
-    rateSpan.childNodes[0].textContent = `1 USD = ${usdToTwd.toFixed(4)} TWD `;
+    usdToTwd = data.rates.TWD;
+    document.getElementById("exchangeRate").innerHTML = 
+      `1 USD = ${usdToTwd.toFixed(4)} TWD <span id="totalAmount" style="margin-left:20px;font-weight:bold;">總金額: 0</span>`;
     calc();
-  }catch(e){
-    if(savedRate){
-      usdToTwd = Number(savedRate);
-      rateSpan.childNodes[0].textContent = `1 USD = ${usdToTwd.toFixed(4)} TWD `;
-    }
-  }
+  }catch(e){console.log("匯率抓取失敗", e);}
 }
-
-  
-function renderExchangeRate(){
-  document.getElementById("exchangeRate").innerHTML = `
-    1 USD = ${usdToTwd.toFixed(4)} TWD
-    <span id="totalAmount" style="margin-left:16px;font-weight:bold;">
-      總金額：0 TWD
-    </span>
-  `;
-}
-  async function updateExchangeRateIfNeeded(){
-  const today = new Date().toISOString().slice(0,10);
-  const savedDate = localStorage.getItem(FX_DATE_KEY);
-  const savedRate = localStorage.getItem(FX_KEY);
-
-  if(savedDate === today && savedRate){
-    usdToTwd = Number(savedRate);
-    renderExchangeRate();
-    return;
-  }
-
-  try{
-    const res = await fetch("https://cdn.moneyconvert.net/api/latest.json");
-    const data = await res.json();
-
-    if(!data?.rates?.TWD) throw new Error("No TWD");
-
-    usdToTwd = Number(data.rates.TWD);
-    localStorage.setItem(FX_KEY, usdToTwd);
-    localStorage.setItem(FX_DATE_KEY, today);
-
-    renderExchangeRate();
-    calc();
-  }catch(e){
-    if(savedRate){
-      usdToTwd = Number(savedRate);
-      renderExchangeRate();
-    }
-  }
-}
-
 
 // —— 計算總價與圓餅圖 —
 function calc(){
@@ -388,14 +317,7 @@ function updateChartColors(){
   }
 }
 
-window.onload = () => {
-  loadHoldings();
-  updateExchangeRateIfNeeded();
-};
-
+window.onload=loadHoldings;
 </script>
 </body>
 </html>
-
-
-
