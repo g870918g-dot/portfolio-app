@@ -95,6 +95,47 @@ button, select {
     font-size: 12px;
   }
 }
+  /* ===== 手機卡片模式 ===== */
+#cardContainer {
+  display: none;
+}
+
+@media (max-width: 768px) {
+
+  table {
+    display: none;
+  }
+
+  #cardContainer {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .stock-card {
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    padding: 12px;
+    background: #fff;
+    font-size: 14px;
+  }
+
+  .stock-card .title {
+    font-size: 16px;
+    font-weight: bold;
+    margin-bottom: 6px;
+  }
+
+  .stock-row {
+    display: flex;
+    justify-content: space-between;
+    margin: 4px 0;
+  }
+
+  .stock-row span:first-child {
+    color: #666;
+  }
+}
 </style>
 </head>
 <body>
@@ -116,6 +157,9 @@ button, select {
         <th>佔比 (%)</th>
       </tr>
     </table>
+    
+    <div id="cardContainer"></div>
+    
     <button onclick="addRow()">新增持股</button>
     <button onclick="updatePrices()">更新股價</button>
     <br>
@@ -235,7 +279,28 @@ async function updateExchangeRate(){
     calc();
   }catch(e){console.log("匯率抓取失敗", e);}
 }
+  
+function renderCards(stockTotals, totalTWD){
+  const container = document.getElementById("cardContainer");
+  if(!container) return;
 
+  container.innerHTML = "";
+
+  stockTotals.forEach(s => {
+    const pct = totalTWD ? ((s.total / totalTWD) * 100).toFixed(1) : "0.0";
+
+    const card = document.createElement("div");
+    card.className = "stock-card";
+    card.innerHTML = `
+      <div class="title">${s.symbol}</div>
+      <div class="stock-row"><span>股數</span><span>${s.shares}</span></div>
+      <div class="stock-row"><span>股價</span><span>${s.priceText}</span></div>
+      <div class="stock-row"><span>總價 (TWD)</span><span>${s.totalText}</span></div>
+      <div class="stock-row"><span>佔比</span><span>${pct}%</span></div>
+    `;
+    container.appendChild(card);
+  });
+}
 // —— 計算總價與圓餅圖 —
 function calc(){
   const rows = document.querySelectorAll("#holdings tr");
@@ -303,7 +368,7 @@ function calc(){
 
   saveHoldings();
 }
-
+renderCards(stockTotals, totalTWD);
 // —— 表格依總價重新排序 —
 function sortTableByTotal(){
   const table=document.getElementById("holdings");
@@ -325,4 +390,5 @@ window.onload=loadHoldings;
 </script>
 </body>
 </html>
+
 
