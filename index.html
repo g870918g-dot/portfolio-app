@@ -31,6 +31,7 @@ th,td{
   border:1px solid #aaa;
   padding:6px;
   text-align:center;
+  white-space:nowrap;
 }
 
 input{width:80px;}
@@ -44,46 +45,10 @@ button{
   margin-bottom:10px;
 }
 
-/* ===== 桌機預設 ===== */
-#holdings{display:table;}
-#cardContainer{display:none;}
-
-/* ===== 手機卡片模式 ===== */
+/* 手機橫向捲動，避免爆版 */
 @media (max-width:768px){
-
   .container{flex-direction:column;}
-
-  #holdings{display:none;}
-
-  #cardContainer{
-    display:flex;
-    flex-direction:column;
-    gap:12px;
-  }
-
-  .stock-card{
-    border:1px solid #ccc;
-    border-radius:10px;
-    padding:12px;
-    background:#fff;
-  }
-
-  .stock-title{
-    font-size:16px;
-    font-weight:bold;
-    margin-bottom:6px;
-  }
-
-  .stock-row{
-    display:flex;
-    justify-content:space-between;
-    margin:4px 0;
-    font-size:14px;
-  }
-
-  .stock-row span:first-child{
-    color:#666;
-  }
+  table{display:block;overflow-x:auto;}
 }
 </style>
 </head>
@@ -110,8 +75,6 @@ button{
       </tr>
     </table>
 
-    <div id="cardContainer"></div>
-
     <button onclick="addRow()">新增持股</button>
     <button onclick="updatePrices()">更新股價</button>
   </div>
@@ -124,12 +87,12 @@ button{
 <script>
 /* ===== API KEY ===== */
 const FINNHUB_KEY="d5ofc59r01qjast6ddl0d5ofc59r01qjast6ddlg";
-const FINMIND_TOKEN="eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."; // 保留你原本完整 token
+const FINMIND_TOKEN="你的完整 FinMind Token";
 
 let usdToTwd=30;
 let chart;
 
-/* ===== 工具 ===== */
+/* ===== 判斷台股 ===== */
 function isTaiwanStock(sym){
   return /^\d+$/.test(sym) || /^00\d{3}[LR]?$/.test(sym);
 }
@@ -140,7 +103,7 @@ function getPrevTradeDate(){
   return d.toISOString().slice(0,10);
 }
 
-/* ===== 儲存 ===== */
+/* ===== localStorage ===== */
 function saveHoldings(){
   const rows=[...document.querySelectorAll("#holdings tr")].slice(1);
   const data=rows.map(r=>({
@@ -152,7 +115,8 @@ function saveHoldings(){
 
 function loadHoldings(){
   const data=JSON.parse(localStorage.getItem("holdings")||"[]");
-  data.forEach(addRow);
+  if(data.length===0) addRow();
+  else data.forEach(addRow);
   updateExchangeRate();
   updatePrices();
 }
@@ -174,12 +138,16 @@ function addRow(h=null){
 
 /* ===== 匯率 ===== */
 async function updateExchangeRate(){
-  const res=await fetch("https://api.exchangerate.host/latest?base=USD&symbols=TWD");
-  const data=await res.json();
-  usdToTwd=data.rates.TWD;
-  document.getElementById("exchangeRate").innerHTML=
-    `1 USD = ${usdToTwd.toFixed(4)} TWD
-     <span id="totalAmount" style="margin-left:16px;">總金額：0 TWD</span>`;
+  try{
+    const res=await fetch("https://open.er-api.com/v6/latest/USD");
+    const data=await res.json();
+    usdToTwd=data.rates.TWD;
+    document.getElementById("exchangeRate").innerHTML=
+      `1 USD = ${usdToTwd.toFixed(4)} TWD
+       <span id="totalAmount" style="margin-left:16px;">總金額：0 TWD</span>`;
+  }catch{
+    usdToTwd=30;
+  }
 }
 
 /* ===== 股價 ===== */
@@ -209,7 +177,7 @@ async function updateRowPrice(row){
   }
 }
 
-/* ===== 計算 + 圖表 + 卡片 ===== */
+/* ===== 計算 + 圖表 ===== */
 function calc(){
   const rows=[...document.querySelectorAll("#holdings tr")].slice(1);
   let totalTWD=0;
@@ -221,18 +189,14 @@ function calc(){
     if(!sym||shares<=0) return;
 
     let p=r.cells[2].innerText;
-    let twd=p.includes("USD")?Number(p)*usdToTwd:Number(p);
-    const total=shares*twd;
+    let price=p.includes("USD")?Number(p)*usdToTwd:Number(p);
+    const total=shares*price;
 
-    r.cells[3].innerText=total.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g,",");
+    r.cells[3].innerText=
+      total.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g,",");
     totalTWD+=total;
 
-    stocks.push({
-      symbol:sym,
-      total,
-      price:p,
-      shares
-    });
+    stocks.push({symbol:sym,total});
   });
 
   rows.forEach(r=>{
@@ -243,26 +207,8 @@ function calc(){
   document.getElementById("totalAmount").innerText=
     "總金額："+totalTWD.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g,",")+" TWD";
 
-  renderCards(stocks,totalTWD);
   renderChart(stocks);
   saveHoldings();
-}
-
-function renderCards(stocks,totalTWD){
-  const c=document.getElementById("cardContainer");
-  c.innerHTML="";
-  stocks.forEach(s=>{
-    const pct=(s.total/totalTWD*100).toFixed(1);
-    const d=document.createElement("div");
-    d.className="stock-card";
-    d.innerHTML=`
-      <div class="stock-title">${s.symbol}</div>
-      <div class="stock-row"><span>股數</span><span>${s.shares}</span></div>
-      <div class="stock-row"><span>股價</span><span>${s.price}</span></div>
-      <div class="stock-row"><span>總價</span><span>${s.total.toFixed(0)}</span></div>
-      <div class="stock-row"><span>佔比</span><span>${pct}%</span></div>`;
-    c.appendChild(d);
-  });
 }
 
 function renderChart(stocks){
