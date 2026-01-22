@@ -229,17 +229,39 @@ async function updatePricesForRow(row){
   } catch(e){ console.log("抓股價失敗",e); row.cells[2].innerText="0"; }
 }
 
-// —— 更新匯率 —
-async function updateExchangeRate(){
+async function updateExchangeRateIfNeeded(){
+  const rateSpan = document.getElementById("exchangeRate");
+  if(!rateSpan) return; // 保命
+
+  const today = new Date().toISOString().slice(0,10);
+  const savedDate = localStorage.getItem(FX_DATE_KEY);
+  const savedRate = localStorage.getItem(FX_KEY);
+
+  if(savedDate === today && savedRate){
+    usdToTwd = Number(savedRate);
+    rateSpan.childNodes[0].textContent = `1 USD = ${usdToTwd.toFixed(4)} TWD `;
+    return;
+  }
+
   try{
-    const res = await fetch("https://api.exchangerate.host/latest?base=USD&symbols=TWD");
+    const res = await fetch("https://cdn.moneyconvert.net/api/latest.json");
     const data = await res.json();
-    usdToTwd = data.rates.TWD;
-    document.getElementById("exchangeRate").innerHTML = 
-      `1 USD = ${usdToTwd.toFixed(4)} TWD <span id="totalAmount" style="margin-left:20px;font-weight:bold;">總金額: 0</span>`;
+    if(!data?.rates?.TWD) throw "no rate";
+
+    usdToTwd = Number(data.rates.TWD);
+    localStorage.setItem(FX_KEY, usdToTwd);
+    localStorage.setItem(FX_DATE_KEY, today);
+
+    rateSpan.childNodes[0].textContent = `1 USD = ${usdToTwd.toFixed(4)} TWD `;
     calc();
-  }catch(e){console.log("匯率抓取失敗", e);}
+  }catch(e){
+    if(savedRate){
+      usdToTwd = Number(savedRate);
+      rateSpan.childNodes[0].textContent = `1 USD = ${usdToTwd.toFixed(4)} TWD `;
+    }
+  }
 }
+
   
 function renderExchangeRate(){
   document.getElementById("exchangeRate").innerHTML = `
@@ -369,11 +391,11 @@ function updateChartColors(){
 window.onload = () => {
   loadHoldings();
   updateExchangeRateIfNeeded();
-  updatePrices();
 };
 
 </script>
 </body>
 </html>
+
 
 
