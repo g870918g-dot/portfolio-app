@@ -268,10 +268,10 @@ function calc(){
   let chartDataColors=[];
 
   stockTotals.sort((a,b)=>b.total - a.total);
-  const top6 = stockTotals.slice(0,6);
-  const others = stockTotals.slice(6);
+  const top8 = stockTotals.slice(0,8);
+  const others = stockTotals.slice(8);
 
-  top6.forEach((s,i)=>{
+  top8.forEach((s,i)=>{
     chartDataLabels.push(s.symbol);
     chartDataValues.push(s.total);
     chartDataColors.push(s.isTW?warmColors[i%warmColors.length]:coolColors[i%coolColors.length]);
@@ -294,7 +294,7 @@ function calc(){
         const value = context.parsed;
         const total = chartDataValues.reduce((a,b)=>a+b,0);
         const pct = total?(value/total*100).toFixed(1):0; 
-        return `${pct}% (${value.toLocaleString()} TWD)`;
+        return ` ${pct}% (${value.toLocaleString()} TWD)`;
       }}}}
     }
   });
@@ -323,6 +323,7 @@ window.onload=loadHoldings;
 </script>
 </body>
 </html>
+
 
 
 
