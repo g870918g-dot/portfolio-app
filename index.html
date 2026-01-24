@@ -44,15 +44,10 @@ th, td {
   text-align: center;
   word-break: break-word;
 }
-  
-<!-- 股票代碼 -->
-<input type="text" class="symbol-input">
-
-<!-- 股數 -->
-<input type="number" class="shares-input">
-button, select {
-  margin: 4px 2px;
+input {
+  width: 100%;
   font-size: 14px;
+  text-align: right;
 }
   
 /* 手機按鈕並排 */
@@ -92,20 +87,11 @@ button, select {
   th:nth-child(5), td:nth-child(5) { width: 16%; } /* 佔比 */
 
   /* input 縮小 */
-  input {
+input {
   width: 70px;
   font-size: 12px;
 }
 
-/* 股票代碼：靠左 */
-.symbol-input {
-  text-align: left;
-}
-
-/* 股數：靠右 */
-.shares-input {
-  text-align: right;
-}
 }
 
 </style>
@@ -335,6 +321,7 @@ window.onload=loadHoldings;
 </script>
 </body>
 </html>
+
 
 
 
