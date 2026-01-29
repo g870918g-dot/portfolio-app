@@ -3,56 +3,41 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>我的資產配置 (Stable)</title>
+<title>我的資產配置 (Fixed)</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
 /* —— CSS 樣式區 —— */
 body { font-family: "Microsoft JhengHei","PingFang TC",sans-serif; margin: 0; padding: 16px; background-color: #f4f6f8; color: #333; }
-
-/* 佈局容器 */
 .container { display: flex; flex-wrap: wrap; gap: 20px; }
 .left { flex: 1 1 100%; }
 .right { flex: 1 1 100%; max-width: 100%; margin-top: 20px; }
+@media(min-width:768px){ .left { flex:1 1 60%; } .right { flex:1 1 35%; max-width:400px; margin-top:0; } }
 
-/* 桌面版佈局調整 */
-@media(min-width:768px){
-  .left { flex:1 1 60%; }
-  .right { flex:1 1 35%; max-width:400px; margin-top:0; }
-}
-
-/* 數據表格 */
+/* 表格樣式 */
 table { border-collapse: collapse; width: 100%; font-size: 14px; background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border-radius: 8px; overflow: hidden; }
 th, td { border-bottom: 1px solid #eee; padding: 10px 8px; text-align: center; }
 th { background-color: #f1f3f5; font-weight: 600; color: #555; }
-tr:last-child td { border-bottom: none; }
-
-/* 輸入框與按鈕 */
-input { width: 80px; font-size: 14px; text-align: center; border: 1px solid #ddd; padding: 6px; border-radius: 4px; background: #fff; }
-input:focus { outline: none; border-color: #007bff; }
-button { margin: 4px 2px; font-size: 14px; cursor: pointer; padding: 8px 16px; background-color: #007bff; color: white; border: none; border-radius: 4px; transition: background 0.2s; }
+input { width: 80px; font-size: 14px; text-align: center; border: 1px solid #ddd; padding: 6px; border-radius: 4px; }
+button { margin: 4px 2px; font-size: 14px; cursor: pointer; padding: 8px 16px; background-color: #007bff; color: white; border: none; border-radius: 4px; }
 button:hover { background-color: #0056b3; }
 button.refresh-btn { background-color: #28a745; }
 button.refresh-btn:hover { background-color: #218838; }
 
-/* 匯率顯示區 */
-#exchangeRate { font-weight: bold; margin-bottom: 15px; font-size: 16px; color: #444; background: white; padding: 10px; border-radius: 8px; display: inline-block; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-
-/* TradingView 容器樣式 */
-.tradingview-widget-container {
-    margin-bottom: 20px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-    border-radius: 10px;
-    overflow: hidden;
-    border: 1px solid #e0e0e0;
+/* 資訊面板樣式 (修正重點) */
+.info-panel {
+    background: white; padding: 15px; border-radius: 8px; margin-bottom: 15px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;
 }
+.info-item { margin-right: 20px; font-size: 16px; font-weight: bold; color: #444; }
+.info-value { color: #007bff; margin-left: 5px; }
 
-/* Chart Container */
+/* TradingView & Chart */
+.tradingview-widget-container { margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border-radius: 10px; overflow: hidden; border: 1px solid #e0e0e0; }
 .chart-container { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
 
-/* 手機版優化 */
 @media (max-width: 480px) {
+  .info-panel { flex-direction: column; align-items: flex-start; gap: 10px; }
   table { font-size: 12px; }
-  th, td { padding: 6px 4px; }
   input { width: 100%; box-sizing: border-box; }
 }
 </style>
@@ -61,8 +46,13 @@ button.refresh-btn:hover { background-color: #218838; }
 
 <h2>我的資產配置</h2>
 
-<div id="exchangeRate">
-  匯率讀取中...
+<div class="info-panel">
+    <div class="info-item">
+        匯率: <span id="rateDisplay" class="info-value">載入中...</span>
+    </div>
+    <div class="info-item">
+        總資產: <span id="totalDisplay" class="info-value">計算中...</span> <span style="font-size:12px;color:#888;">TWD</span>
+    </div>
 </div>
 
 <div class="container">
@@ -73,12 +63,11 @@ button.refresh-btn:hover { background-color: #218838; }
           <th style="width:20%">代碼</th>
           <th style="width:20%">股數</th>
           <th style="width:25%">市價</th>
-          <th style="width:25%">總值 (TWD)</th>
+          <th style="width:25%">總值</th>
           <th style="width:10%">%</th>
         </tr>
       </thead>
-      <tbody>
-        </tbody>
+      <tbody></tbody>
     </table>
     <div style="margin-top:15px; display:flex; gap:10px;">
         <button onclick="addRow()">+ 新增標的</button>
@@ -87,30 +76,20 @@ button.refresh-btn:hover { background-color: #218838; }
   </div>
 
   <div class="right">
-    
     <div class="tradingview-widget-container">
       <div class="tradingview-widget-container__widget"></div>
       <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-single-quote.js" async>
-      {
-      "symbol": "CBOE:VIX",
-      "width": "100%",
-      "colorTheme": "light",
-      "isTransparent": false,
-      "locale": "zh-TW"
-      }
+      { "symbol": "CBOE:VIX", "width": "100%", "colorTheme": "light", "isTransparent": false, "locale": "zh-TW" }
       </script>
     </div>
-
-    <div class="chart-container">
-        <canvas id="chart"></canvas>
-    </div>
+    <div class="chart-container"><canvas id="chart"></canvas></div>
   </div>
 </div>
 
 <script>
-// —— 1. 全局設定 ——
+// —— 全局變數 ——
 let chartInstance = null;
-let usdToTwd = 30; // 預設值
+let usdToTwd = 30; // 預設匯率
 const FINNHUB_KEY = "d5ofc59r01qjast6ddl0d5ofc59r01qjast6ddlg";  
 const FINMIND_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNi0wMS0yMiAwMjowMzo1MyIsInVzZXJfaWQiOiJnODcwOTE4ZyIsImVtYWlsIjoiZzg3MDkxOGdAZ21haWwuY29tIiwiaXAiOiI2MS4yMzAuMzcuMzEifQ.sunKX_jHdSZAmXUMztvTVOjm9ZCZYNN_xm1fm-Xi7aE"; 
 
@@ -120,47 +99,54 @@ const colors = {
     other: "#95a5a6"
 };
 
-// —— 2. 初始化 ——
+// —— 初始化 ——
 window.onload = function() {
-    loadHoldings();
-    updateExchangeRate(); 
-    // updateVIX 已移除，改用 TradingView Widget
+    loadHoldings();       // 1. 先建立表格
+    updateExchangeRate(); // 2. 抓匯率 (抓完會自動觸發計算)
 };
 
-// —— 3. 匯率邏輯 (open.er-api) ——
+// —— 匯率邏輯 (修復版) ——
 async function updateExchangeRate(){
     try{
         const res = await fetch("https://open.er-api.com/v6/latest/USD");
         const data = await res.json();
-        usdToTwd = data.rates.TWD;
-        document.getElementById("exchangeRate").innerHTML = 
-            `1 USD ≈ ${usdToTwd.toFixed(2)} TWD <span style="margin-left:15px; font-weight:normal; color:#666">總資產即時計算</span>`;
-        recalcTotal(); 
+        if(data && data.rates && data.rates.TWD){
+            usdToTwd = data.rates.TWD;
+            document.getElementById("rateDisplay").innerText = `1 USD ≈ ${usdToTwd.toFixed(2)} TWD`;
+        }
     } catch(e){
-        console.log("匯率抓取失敗，使用預設值 30");
+        console.log("匯率失敗，使用預設 30");
+        document.getElementById("rateDisplay").innerText = "匯率來源異常 (預設 30)";
     }
+    // 無論匯率成功失敗，都執行一次計算，避免畫面卡住
+    recalcTotal();
 }
 
-// —— 4. 持股管理 (LocalStorage) ——
+// —— 持股管理 ——
 function saveHoldings(){
     const rows = document.querySelectorAll("#holdings tbody tr");
     const data = [];
     rows.forEach(r => {
-        const sym = r.cells[0].children[0].value.trim().toUpperCase();
-        const shares = r.cells[1].children[0].value;
+        const inputs = r.getElementsByTagName("input");
+        const sym = inputs[0].value.trim().toUpperCase();
+        const shares = inputs[1].value;
         if(sym) data.push({symbol: sym, shares: shares});
     });
-    localStorage.setItem("my_portfolio_v3", JSON.stringify(data));
+    localStorage.setItem("my_portfolio_fixed", JSON.stringify(data));
 }
 
 function loadHoldings(){
-    const data = JSON.parse(localStorage.getItem("my_portfolio_v3") || "[]");
+    const data = JSON.parse(localStorage.getItem("my_portfolio_fixed") || "[]");
+    const tbody = document.querySelector("#holdings tbody");
+    tbody.innerHTML = ""; // 清空防止重複
+    
     if(data.length === 0) {
         addRow({symbol: "00631L", shares: 1000}); 
         addRow({symbol: "TSM", shares: 10});
     } else {
         data.forEach(h => addRow(h));
     }
+    // 載入後觸發一次更新股價
     updatePrices(); 
 }
 
@@ -170,14 +156,158 @@ function addRow(data = null){
     tr.innerHTML = `
         <td><input type="text" placeholder="代碼" onchange="saveHoldings()" value="${data ? data.symbol : ''}"></td>
         <td><input type="number" placeholder="股數" onchange="saveHoldings()" value="${data ? data.shares : 0}"></td>
-        <td>-</td>
-        <td>0</td>
-        <td>0%</td>
+        <td class="price">-</td>
+        <td class="total">0</td>
+        <td class="pct">0%</td>
     `;
+    // 刪除按鈕 (選用)
+    // const delTd = document.createElement("td");
+    // delTd.innerHTML = '<button onclick="this.parentElement.parentElement.remove();saveHoldings();recalcTotal()" style="padding:2px 6px;background:#dc3545;">x</button>';
+    // tr.appendChild(delTd);
+    
     tbody.appendChild(tr);
     saveHoldings();
 }
 
-// —— 5. 股價更新邏輯 (FinMind + Finnhub) ——
+// —— 股價更新 ——
 function isTaiwanStock(sym){
     return /^\d{4,6}$/.test(sym) || /^00\d{3}[a-zA-Z]?$/.test(sym);
+}
+
+function getFormatDate(){
+    let d = new Date();
+    // 避免抓到假日，簡易推算
+    if(d.getDay() === 0) d.setDate(d.getDate() - 2); // 週日 -> 週五
+    else if(d.getDay() === 6) d.setDate(d.getDate() - 1); // 週六 -> 週五
+    else if(d.getHours() < 14) d.setDate(d.getDate() - 1); // 收盤前 -> 昨天
+    return d.toISOString().split('T')[0];
+}
+
+async function updatePrices(){
+    const rows = document.querySelectorAll("#holdings tbody tr");
+    const promises = Array.from(rows).map(async (row) => {
+        const inputs = row.getElementsByTagName("input");
+        const sym = inputs[0].value.trim().toUpperCase();
+        if(!sym) return;
+
+        const priceCell = row.querySelector(".price");
+        
+        try {
+            if(isTaiwanStock(sym)){
+                // 台股
+                const date = getFormatDate();
+                const url = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPrice&data_id=${sym}&start_date=${date}&token=${FINMIND_TOKEN}`;
+                const res = await fetch(url);
+                const json = await res.json();
+                if(json.data && json.data.length > 0){
+                    const p = json.data[json.data.length - 1].close;
+                    priceCell.innerText = `${p} TWD`;
+                } else {
+                    priceCell.innerText = "待更新";
+                }
+            } else {
+                // 美股
+                const url = `https://finnhub.io/api/v1/quote?symbol=${sym}&token=${FINNHUB_KEY}`;
+                const res = await fetch(url);
+                const json = await res.json();
+                if(json.c) priceCell.innerText = `${json.c.toFixed(2)} USD`;
+                else priceCell.innerText = "Error";
+            }
+        } catch(e) {
+            console.error(sym, e);
+            priceCell.innerText = "Err";
+        }
+    });
+
+    await Promise.all(promises);
+    recalcTotal();
+}
+
+// —— 計算總值 ——
+function recalcTotal(){
+    const rows = document.querySelectorAll("#holdings tbody tr");
+    let totalTwd = 0;
+    let items = [];
+
+    rows.forEach(row => {
+        const inputs = row.getElementsByTagName("input");
+        const sym = inputs[0].value.trim().toUpperCase();
+        const shares = parseFloat(inputs[1].value) || 0;
+        
+        const priceText = row.querySelector(".price").innerText;
+        let price = 0;
+
+        if(priceText.includes("USD")) price = parseFloat(priceText) * usdToTwd;
+        else if(priceText.includes("TWD")) price = parseFloat(priceText);
+
+        const value = Math.floor(shares * price);
+        row.querySelector(".total").innerText = value.toLocaleString();
+        totalTwd += value;
+
+        if(value > 0) items.push({ symbol: sym, value: value, isTw: isTaiwanStock(sym) });
+    });
+
+    // 更新 %
+    rows.forEach(row => {
+        const valStr = row.querySelector(".total").innerText.replace(/,/g, '');
+        const val = parseFloat(valStr) || 0;
+        const pct = totalTwd ? ((val / totalTwd) * 100).toFixed(1) : 0;
+        row.querySelector(".pct").innerText = `${pct}%`;
+    });
+
+    // 更新總金額
+    document.getElementById("totalDisplay").innerText = totalTwd.toLocaleString();
+    
+    // 繪圖
+    drawChart(items, totalTwd);
+}
+
+function drawChart(items, total){
+    if(items.length === 0) return;
+    items.sort((a,b) => b.value - a.value);
+
+    const topItems = items.slice(0, 5);
+    const otherItems = items.slice(5);
+    
+    let labels = [], data = [], chartColors = [];
+
+    topItems.forEach((item, index) => {
+        labels.push(item.symbol);
+        data.push(item.value);
+        if(item.isTw) chartColors.push(colors.tw[index % colors.tw.length]);
+        else chartColors.push(colors.us[index % colors.us.length]);
+    });
+
+    if(otherItems.length > 0){
+        labels.push("其他");
+        data.push(otherItems.reduce((sum, i) => sum + i.value, 0));
+        chartColors.push(colors.other);
+    }
+
+    const ctx = document.getElementById('chart').getContext('2d');
+    if(chartInstance) chartInstance.destroy();
+
+    chartInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: { labels, datasets: [{ data, backgroundColor: chartColors, borderWidth: 0 }] },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'right', labels: { boxWidth: 12 } },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let val = context.raw;
+                            let pct = ((val / total) * 100).toFixed(1);
+                            return ` ${context.label}: ${pct}% (${val.toLocaleString()})`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+</script>
+</body>
+</html>
