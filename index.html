@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>我的資產配置 (Final)</title>
+<title>資產配置儀表板 (Final)</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
 /* —— CSS 樣式區 —— */
@@ -13,6 +13,8 @@ body { font-family: "Microsoft JhengHei","PingFang TC",sans-serif; margin: 0; pa
 .container { display: flex; flex-wrap: wrap; gap: 20px; }
 .left { flex: 1 1 100%; }
 .right { flex: 1 1 100%; max-width: 100%; margin-top: 20px; }
+
+/* 桌面版佈局：左 60%，右 35% */
 @media(min-width:768px){ 
     .left { flex:1 1 60%; } 
     .right { flex:1 1 35%; max-width:400px; margin-top:0; } 
@@ -39,12 +41,20 @@ button.refresh-btn:hover { background-color: #218838; }
 /* VIX 容器樣式 */
 .vix-container {
     background: white; 
-    padding: 10px; 
+    padding: 0; 
     border-radius: 10px; 
     box-shadow: 0 4px 12px rgba(0,0,0,0.05); 
     border: 1px solid #e0e0e0; 
     margin-bottom: 20px;
-    overflow: hidden;
+    overflow: hidden; /* 確保 iframe 圓角 */
+}
+.vix-header {
+    background: #f8f9fa;
+    padding: 10px;
+    font-weight: bold;
+    color: #555;
+    text-align: center;
+    border-bottom: 1px solid #eee;
 }
 
 /* Chart Container */
@@ -66,7 +76,7 @@ button.refresh-btn:hover { background-color: #218838; }
         匯率: <span id="rateDisplay" class="info-value">載入中...</span>
     </div>
     <div class="info-item">
-        總資產: <span id="totalDisplay" class="info-value">計算中...</span> <span style="font-size:12px;color:#888;">TWD</span>
+        總資產: <span id="totalDisplay" class="info-value">0</span> <span style="font-size:12px;color:#888;">TWD</span>
     </div>
 </div>
 
@@ -93,11 +103,11 @@ button.refresh-btn:hover { background-color: #218838; }
   <div class="right">
     
     <div class="vix-container">
-        <div style="font-weight:bold; color:#555; margin-bottom:5px; text-align:center;">VIX 恐慌指數</div>
+        <div class="vix-header">VIX 恐慌指數 (Investing.com)</div>
         <iframe 
             src="https://ssltsw.forexprostools.com?theme=light&pairs=44336&t=2" 
             width="100%" 
-            height="180" 
+            height="200" 
             frameborder="0" 
             allowtransparency="true" 
             marginwidth="0" 
@@ -126,23 +136,44 @@ const colors = {
 
 // —— 初始化 ——
 window.onload = function() {
-    loadHoldings();       // 1. 建立表格
-    updateExchangeRate(); // 2. 抓匯率 (完成後會自動觸發 recalcTotal)
+    console.log("App Started...");
+    try {
+        loadHoldings();       // 1. 建立表格
+        updateExchangeRate(); // 2. 抓匯率 (含防卡死機制)
+    } catch (e) {
+        console.error("Init Error:", e);
+        alert("程式初始化失敗，請檢查 Console");
+    }
 };
 
-// —— 匯率邏輯 ——
+// —— 匯率邏輯 (加強版：防卡死) ——
 async function updateExchangeRate(){
+    let rateLoaded = false;
+    
+    // 設定一個 2 秒的計時器，如果 API 太慢，直接用預設值
+    setTimeout(() => {
+        if(!rateLoaded) {
+            console.log("匯率 API 回應超時，使用預設值 30");
+            document.getElementById("rateDisplay").innerText = "30.00 (預設)";
+            usdToTwd = 30;
+            recalcTotal();
+        }
+    }, 2000);
+
     try{
         const res = await fetch("https://open.er-api.com/v6/latest/USD");
         const data = await res.json();
         if(data && data.rates && data.rates.TWD){
             usdToTwd = data.rates.TWD;
             document.getElementById("rateDisplay").innerText = `1 USD ≈ ${usdToTwd.toFixed(2)} TWD`;
+            rateLoaded = true; // 標記為成功
         }
     } catch(e){
-        console.log("匯率失敗，使用預設 30");
-        document.getElementById("rateDisplay").innerText = "匯率異常 (預設 30)";
+        console.log("匯率抓取失敗:", e);
+        document.getElementById("rateDisplay").innerText = "連線異常 (預設 30)";
     }
+    
+    // 確保無論如何都執行一次計算
     recalcTotal();
 }
 
@@ -156,20 +187,22 @@ function saveHoldings(){
         const shares = inputs[1].value;
         if(sym) data.push({symbol: sym, shares: shares});
     });
-    localStorage.setItem("my_portfolio_fixed", JSON.stringify(data));
+    localStorage.setItem("my_portfolio_final", JSON.stringify(data));
 }
 
 function loadHoldings(){
-    const data = JSON.parse(localStorage.getItem("my_portfolio_fixed") || "[]");
+    const data = JSON.parse(localStorage.getItem("my_portfolio_final") || "[]");
     const tbody = document.querySelector("#holdings tbody");
     tbody.innerHTML = ""; 
     
     if(data.length === 0) {
+        // 預設範例
         addRow({symbol: "00631L", shares: 1000}); 
         addRow({symbol: "TSM", shares: 10});
     } else {
         data.forEach(h => addRow(h));
     }
+    // 載入後觸發更新股價
     updatePrices(); 
 }
 
@@ -183,7 +216,8 @@ function addRow(data = null){
         <td class="total">0</td>
         <td class="pct">0%</td>
     `;
-    // 加入刪除按鈕 (雙擊刪除功能，若不需要可移除)
+    
+    // 雙擊刪除功能
     tr.ondblclick = function() {
         if(confirm("確定移除此股票？")) {
             this.remove();
@@ -203,7 +237,6 @@ function isTaiwanStock(sym){
 
 function getFormatDate(){
     let d = new Date();
-    // 簡單避開週末
     if(d.getDay() === 0) d.setDate(d.getDate() - 2); 
     else if(d.getDay() === 6) d.setDate(d.getDate() - 1); 
     else if(d.getHours() < 14) d.setDate(d.getDate() - 1); 
@@ -218,6 +251,7 @@ async function updatePrices(){
         if(!sym) return;
 
         const priceCell = row.querySelector(".price");
+        priceCell.innerText = "..."; // 顯示載入中
         
         try {
             if(isTaiwanStock(sym)){
@@ -293,4 +327,48 @@ function drawChart(items, total){
     if(items.length === 0) return;
     items.sort((a,b) => b.value - a.value);
 
-    const topItems =
+    const topItems = items.slice(0, 5);
+    const otherItems = items.slice(5);
+    
+    let labels = [], data = [], chartColors = [];
+
+    topItems.forEach((item, index) => {
+        labels.push(item.symbol);
+        data.push(item.value);
+        if(item.isTw) chartColors.push(colors.tw[index % colors.tw.length]);
+        else chartColors.push(colors.us[index % colors.us.length]);
+    });
+
+    if(otherItems.length > 0){
+        labels.push("其他");
+        data.push(otherItems.reduce((sum, i) => sum + i.value, 0));
+        chartColors.push(colors.other);
+    }
+
+    const ctx = document.getElementById('chart').getContext('2d');
+    if(chartInstance) chartInstance.destroy();
+
+    chartInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: { labels, datasets: [{ data, backgroundColor: chartColors, borderWidth: 0 }] },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'right', labels: { boxWidth: 12 } },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let val = context.raw;
+                            let pct = ((val / total) * 100).toFixed(1);
+                            return ` ${context.label}: ${pct}% (${val.toLocaleString()})`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+</script>
+</body>
+</html>
