@@ -1,276 +1,158 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh-Hant">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>持股比例 App</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-<style>
-body {
-  font-family: "Microsoft JhengHei","PingFang TC","Heiti TC",sans-serif;
-  margin: 0;
-  padding: 16px;
-}
-
-.container {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 20px;
-}
-
-.left { flex: 1 1 100%; }
-.right { flex: 1 1 100%; margin-top: 20px; }
-
-@media(min-width:768px){
-  .left { flex:1 1 60%; }
-  .right { flex:1 1 35%; max-width:400px; margin-top:0; }
-}
-
-table {
-  border-collapse: collapse;
-  width: 100%;
-  font-size: 14px;
-}
-
-th, td {
-  border: 1px solid #aaa;
-  padding: 8px;
-  text-align: center;
-}
-
-input {
-  width: 70px;
-  font-size: 14px;
-}
-
-input.symbol {
-  text-align: left;
-}
-
-input.shares {
-  text-align: right;
-}
-
-button {
-  margin: 6px 4px;
-}
-
-#exchangeRate {
-  font-weight: bold;
-  margin-bottom: 6px;
-}
-
-#vixBox {
-  font-size: 12px;
-  margin-bottom: 12px;
-}
-</style>
+  <meta charset="UTF-8" />
+  <title>持股比例</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; }
+    table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+    th, td { border: 1px solid #999; padding: 6px; text-align: center; }
+    input { width: 80px; }
+    .vix-box { margin-top: 10px; }
+    .vix-bar { width: 300px; height: 10px; background: #ddd; position: relative; }
+    .vix-fill { height: 100%; width: 0%; background: #4caf50; }
+  </style>
 </head>
-
 <body>
 
 <h2>持股比例</h2>
+<div id="fx">1 USD = -- TWD</div>
+<div id="total">總金額：0 TWD</div>
+<div id="vixText">VIX（三日）：讀取中...</div>
 
-<div id="exchangeRate">
-  1 USD = 30 TWD
-  <span id="totalAmount" style="margin-left:20px;">總金額: 0</span>
-</div>
+<table id="stockTable">
+  <thead>
+    <tr>
+      <th>股票代碼</th>
+      <th>股數</th>
+      <th>股價</th>
+      <th>總價 (TWD)</th>
+      <th>佔比 %</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><input value="2330"></td>
+      <td><input type="number" value="1"></td>
+      <td class="price">0</td>
+      <td class="value">0</td>
+      <td class="ratio">0</td>
+    </tr>
+  </tbody>
+</table>
 
-<div id="vixBox">VIX（近三日）：讀取中…</div>
+<button onclick="addRow()">新增</button>
+<button onclick="updateAll()">更新</button>
 
-<div class="container">
-  <div class="left">
-    <table id="holdings">
-      <tr>
-        <th>股票代碼</th>
-        <th>股數</th>
-        <th>股價</th>
-        <th>總價 (TWD)</th>
-        <th>佔比 %</th>
-      </tr>
-    </table>
+<canvas id="pie" width="400" height="400"></canvas>
 
-    <button onclick="addRow()">新增</button>
-    <button onclick="updatePrices()">更新</button>
+<div class="vix-box">
+  <div>VIX 近三日平均</div>
+  <div class="vix-bar">
+    <div id="vixFill" class="vix-fill"></div>
   </div>
-
-  <div class="right">
-    <canvas id="chart"></canvas>
-
-    <!-- VIX 量表 -->
-    <div style="margin-top:14px;">
-      <div style="font-size:12px; margin-bottom:4px;">VIX 近三日平均</div>
-      <div style="background:#e0e0e0; height:10px; border-radius:6px;">
-        <div id="vixBar" style="height:10px; width:0%; background:#4CAF50; border-radius:6px;"></div>
-      </div>
-      <div id="vixAvgText" style="font-size:12px; margin-top:4px;">平均值：—</div>
-    </div>
-  </div>
+  <div id="vixAvg">平均值：--</div>
 </div>
 
 <script>
-/* ========= 全域 ========= */
-let chart;
-let usdToTwd = 30;
+let fxRate = 30;
+let pieChart = null;
 
-const FINNHUB_KEY = "YOUR_FINNHUB_KEY";
-const FINMIND_TOKEN = "YOUR_FINMIND_TOKEN";
-
-const warmColors = ["#8B1C00","#B23100","#D74C1C","#E86B3F","#F2916B"];
-const coolColors = ["#1A1F5A","#2C2D8C","#3D4BB5","#5A6CD6","#7C95E6"];
-const othersColor = "#E0E0E0";
-
-/* ========= 工具 ========= */
-function isTaiwanStock(sym){
-  return /^\d+$/.test(sym) || /^00\d{3}[LR]?$/.test(sym);
+function addRow() {
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><input></td>
+    <td><input type="number" value="1"></td>
+    <td class="price">0</td>
+    <td class="value">0</td>
+    <td class="ratio">0</td>`;
+  document.querySelector('#stockTable tbody').appendChild(tr);
 }
 
-function getPreviousTradeDate(){
-  const d = new Date();
-  do { d.setDate(d.getDate()-1); } while(d.getDay()===0||d.getDay()===6);
-  return d.toISOString().slice(0,10);
-}
-
-/* ========= 表格 ========= */
-function addRow(h=null){
-  const row = document.getElementById("holdings").insertRow();
-  row.innerHTML = `
-    <td><input class="symbol" placeholder="AAPL / 2330"></td>
-    <td><input class="shares" type="number" value="0"></td>
-    <td>0</td>
-    <td>0</td>
-    <td>0</td>
-  `;
-  if(h){
-    row.cells[0].children[0].value = h.symbol;
-    row.cells[1].children[0].value = h.shares;
+async function updateFXRate() {
+  try {
+    const res = await fetch('https://api.exchangerate.host/latest?base=USD&symbols=TWD');
+    const data = await res.json();
+    fxRate = data.rates.TWD;
+    document.getElementById('fx').innerText = `1 USD = ${fxRate.toFixed(2)} TWD`;
+  } catch {
+    document.getElementById('fx').innerText = '1 USD = 30 TWD';
   }
 }
 
-async function updatePrices(){
-  const rows = [...document.querySelectorAll("#holdings tr")].slice(1);
-  for(const r of rows) await updateRowPrice(r);
-  calc();
+async function updateVIX() {
+  try {
+    const res = await fetch('https://api.stlouisfed.org/fred/series/observations?series_id=VIXCLS&api_key=YOUR_KEY&file_type=json&limit=3');
+    const data = res.ok ? (await res.json()).observations : null;
+    if (!data) throw 0;
+    const values = data.map(d => Number(d.value)).filter(v => !isNaN(v));
+    const avg = values.reduce((a,b)=>a+b,0)/values.length;
+    document.getElementById('vixText').innerText = `VIX（三日）：${values.join(', ')}`;
+    document.getElementById('vixAvg').innerText = `平均值：${avg.toFixed(2)}`;
+    const pct = Math.min(avg/40*100,100);
+    const fill = document.getElementById('vixFill');
+    fill.style.width = pct + '%';
+    fill.style.background = avg > 20 ? '#ff5722' : '#4caf50';
+  } catch {
+    document.getElementById('vixText').innerText = 'VIX（三日）：無法取得';
+  }
 }
 
-async function updateRowPrice(row){
-  const sym = row.cells[0].children[0].value.trim().toUpperCase();
-  if(!sym) return;
-
-  try{
-    if(isTaiwanStock(sym)){
-      const date = getPreviousTradeDate();
-      const res = await fetch(`https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPrice&data_id=${sym}&start_date=${date}&end_date=${date}&token=${FINMIND_TOKEN}`);
-      const d = await res.json();
-      row.cells[2].innerText = d.data?.[0]?.close?.toFixed(2)+" TWD" || "0";
-    }else{
-      const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${sym}&token=${FINNHUB_KEY}`);
-      const d = await res.json();
-      row.cells[2].innerText = d.c?.toFixed(2)+" USD" || "0";
+async function updatePrices() {
+  const rows = document.querySelectorAll('#stockTable tbody tr');
+  for (const row of rows) {
+    let symbol = row.children[0].querySelector('input').value.trim();
+    const qty = Number(row.children[1].querySelector('input').value);
+    if (/^\d{4}$/.test(symbol)) symbol += '.TW';
+    try {
+      const res = await fetch(`https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbol}`);
+      const data = await res.json();
+      const price = data.quoteResponse.result[0]?.regularMarketPrice || 0;
+      row.querySelector('.price').innerText = price.toFixed(2);
+      row.querySelector('.value').innerText = (price * qty).toFixed(2);
+    } catch {
+      row.querySelector('.price').innerText = '0';
+      row.querySelector('.value').innerText = '0';
     }
-  }catch{}
-}
-
-/* ========= 匯率 ========= */
-async function updateExchangeRate(){
-  const res = await fetch("https://api.moneyconvert.net/api/latest/USD");
-  const data = await res.json();
-  usdToTwd = data.rates.TWD;
-  document.getElementById("exchangeRate").innerHTML =
-    `1 USD = ${usdToTwd.toFixed(2)} TWD <span id="totalAmount" style="margin-left:20px;">總金額: 0</span>`;
-}
-
-/* ========= VIX ========= */
-async function updateVIX(){
-  const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=^VIX&token=${FINNHUB_KEY}`);
-  const d = await res.json();
-  const today = new Date().toISOString().slice(0,10);
-
-  let history = JSON.parse(localStorage.getItem("vix_history")) || [];
-  if(!history.some(x=>x.date===today)){
-    history.push({date:today,vix:d.c});
-    history = history.slice(-3);
-    localStorage.setItem("vix_history",JSON.stringify(history));
   }
-
-  document.getElementById("vixBox").textContent =
-    "VIX（近三日）：" + history.map(x=>x.vix.toFixed(1)).join(" / ");
-
-  renderVIXGauge(history);
 }
 
-function renderVIXGauge(history){
-  const avg = history.reduce((s,x)=>s+x.vix,0)/history.length;
-  const pct = Math.min(avg/40*100,100);
-
-  const bar = document.getElementById("vixBar");
-  bar.style.width = pct+"%";
-  bar.style.background = avg>=20 ? "#E85C0D" : "#4CAF50";
-
-  document.getElementById("vixAvgText").textContent =
-    `平均值：${avg.toFixed(1)}`;
-}
-
-/* ========= 計算 + 圓餅 ========= */
-function calc(){
-  const rows = [...document.querySelectorAll("#holdings tr")].slice(1);
+function calcTotalAndPie() {
+  const rows = document.querySelectorAll('#stockTable tbody tr');
   let total = 0;
-  const items=[];
+  rows.forEach(r => total += Number(r.querySelector('.value').innerText));
+  document.getElementById('total').innerText = `總金額：${total.toFixed(2)} TWD`;
 
-  rows.forEach(r=>{
-    const shares = +r.cells[1].children[0].value;
-    let price = parseFloat(r.cells[2].innerText)||0;
-    if(r.cells[2].innerText.includes("USD")) price*=usdToTwd;
-    const sum = shares*price;
-    r.cells[3].innerText = sum.toLocaleString();
-    total+=sum;
-    if(sum>0) items.push({sym:r.cells[0].children[0].value,sum,isTW:isTaiwanStock(r.cells[0].children[0].value)});
+  const labels = [];
+  const data = [];
+  rows.forEach(r => {
+    const sym = r.children[0].querySelector('input').value;
+    const val = Number(r.querySelector('.value').innerText);
+    const ratio = total ? val/total*100 : 0;
+    r.querySelector('.ratio').innerText = ratio.toFixed(1);
+    if (val > 0) {
+      labels.push(sym);
+      data.push(val);
+    }
   });
 
-  document.getElementById("totalAmount").innerText =
-    `總金額: ${total.toLocaleString()} TWD`;
-
-  items.forEach((x,i)=>{
-    rows[i].cells[4].innerText = ((x.sum/total)*100).toFixed(1);
-  });
-
-  renderChart(items);
-}
-
-function renderChart(items){
-  items.sort((a,b)=>b.sum-a.sum);
-  const top = items.slice(0,8);
-  const others = items.slice(8);
-
-  const labels=[], values=[], colors=[];
-  top.forEach((x,i)=>{
-    labels.push(x.sym);
-    values.push(x.sum);
-    colors.push(x.isTW?warmColors[i%warmColors.length]:coolColors[i%coolColors.length]);
-  });
-  if(others.length){
-    labels.push("Others");
-    values.push(others.reduce((s,x)=>s+x.sum,0));
-    colors.push(othersColor);
-  }
-
-  if(chart) chart.destroy();
-  chart = new Chart(document.getElementById("chart"),{
-    type:"pie",
-    data:{labels,datasets:[{data:values,backgroundColor:colors}]},
-    options:{plugins:{tooltip:{callbacks:{
-      label:c=>`${c.label}: ${(c.parsed/values.reduce((a,b)=>a+b,0)*100).toFixed(1)}%`
-    }}}}
+  if (pieChart) pieChart.destroy();
+  pieChart = new Chart(document.getElementById('pie'), {
+    type: 'pie',
+    data: { labels, datasets: [{ data }] }
   });
 }
 
-/* ========= 啟動 ========= */
-window.onload = ()=>{
-  updateExchangeRate();
+async function updateAll() {
+  await updateFXRate();
+  await updatePrices();
+  calcTotalAndPie();
   updateVIX();
-  addRow();
-};
+}
+
+updateFXRate();
+updateVIX();
 </script>
 
 </body>
