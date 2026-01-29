@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>資產配置儀表板 (Final)</title>
+<title>我的資產配置 (Final)</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
 /* —— CSS 樣式區 —— */
@@ -38,7 +38,7 @@ button.refresh-btn:hover { background-color: #218838; }
 .info-item { margin-right: 20px; font-size: 16px; font-weight: bold; color: #444; }
 .info-value { color: #007bff; margin-left: 5px; }
 
-/* VIX 容器樣式 */
+/* VIX 容器樣式 (修正為無內距，讓 Widget 填滿) */
 .vix-container {
     background: white; 
     padding: 0; 
@@ -46,15 +46,7 @@ button.refresh-btn:hover { background-color: #218838; }
     box-shadow: 0 4px 12px rgba(0,0,0,0.05); 
     border: 1px solid #e0e0e0; 
     margin-bottom: 20px;
-    overflow: hidden; /* 確保 iframe 圓角 */
-}
-.vix-header {
-    background: #f8f9fa;
-    padding: 10px;
-    font-weight: bold;
-    color: #555;
-    text-align: center;
-    border-bottom: 1px solid #eee;
+    overflow: hidden; 
 }
 
 /* Chart Container */
@@ -102,27 +94,27 @@ button.refresh-btn:hover { background-color: #218838; }
 
   <div class="right">
     
-    <div class="vix-container" style="padding:0; border:none; box-shadow:none;">
-    <div class="tradingview-widget-container" style="border: 1px solid #e0e0e0; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
-      <div class="tradingview-widget-container__widget"></div>
-      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js" async>
-      {
-        "symbol": "TVC:VIX",
-        "width": "100%",
-        "height": "220",
-        "locale": "zh-TW",
-        "dateRange": "1M",
-        "colorTheme": "light",
-        "trendLineColor": "rgba(41, 98, 255, 1)",
-        "underLineColor": "rgba(41, 98, 255, 0.3)",
-        "underLineBottomColor": "rgba(41, 98, 255, 0)",
-        "isTransparent": false,
-        "autosize": false,
-        "largeChartUrl": ""
-      }
-      </script>
+    <div class="vix-container">
+        <div class="tradingview-widget-container">
+          <div class="tradingview-widget-container__widget"></div>
+          <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js" async>
+          {
+            "symbol": "TVC:VIX",
+            "width": "100%",
+            "height": "220",
+            "locale": "zh-TW",
+            "dateRange": "1M",
+            "colorTheme": "light",
+            "trendLineColor": "rgba(41, 98, 255, 1)",
+            "underLineColor": "rgba(41, 98, 255, 0.3)",
+            "underLineBottomColor": "rgba(41, 98, 255, 0)",
+            "isTransparent": false,
+            "autosize": false,
+            "largeChartUrl": ""
+          }
+          </script>
+        </div>
     </div>
-</div>
 
     <div class="chart-container">
         <canvas id="chart"></canvas>
@@ -159,7 +151,7 @@ window.onload = function() {
 async function updateExchangeRate(){
     let rateLoaded = false;
     
-    // 設定一個 2 秒的計時器，如果 API 太慢，直接用預設值
+    // 設定一個 2 秒的計時器，如果 API 太慢，直接用預設值，避免卡住
     setTimeout(() => {
         if(!rateLoaded) {
             console.log("匯率 API 回應超時，使用預設值 30");
@@ -182,7 +174,6 @@ async function updateExchangeRate(){
         document.getElementById("rateDisplay").innerText = "連線異常 (預設 30)";
     }
     
-    // 確保無論如何都執行一次計算
     recalcTotal();
 }
 
@@ -211,7 +202,6 @@ function loadHoldings(){
     } else {
         data.forEach(h => addRow(h));
     }
-    // 載入後觸發更新股價
     updatePrices(); 
 }
 
@@ -260,7 +250,7 @@ async function updatePrices(){
         if(!sym) return;
 
         const priceCell = row.querySelector(".price");
-        priceCell.innerText = "..."; // 顯示載入中
+        priceCell.innerText = "..."; 
         
         try {
             if(isTaiwanStock(sym)){
@@ -381,5 +371,3 @@ function drawChart(items, total){
 </script>
 </body>
 </html>
-
-
