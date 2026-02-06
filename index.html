@@ -23,7 +23,7 @@ body { font-family: "Microsoft JhengHei","PingFang TC",sans-serif; margin: 0; pa
 /* 表格樣式 */
 table { border-collapse: collapse; width: 100%; font-size: 14px; background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border-radius: 8px; overflow: hidden; }
 th, td { border-bottom: 1px solid #eee; padding: 10px 8px; text-align: center; }
-th { background-color: #f1f3f5; font-weight: 600; color: #555; cursor: pointer; }
+th { background-color: #f1f3f5; font-weight: 600; color: #555; }
 tr { transition: background-color 0.3s; }
 input { width: 80px; font-size: 14px; text-align: center; border: 1px solid #ddd; padding: 6px; border-radius: 4px; }
 input:focus { outline: none; border-color: #007bff; }
@@ -157,11 +157,11 @@ function saveHoldings(){
         const shares = inputs[1].value;
         if(sym) data.push({symbol: sym, shares: shares});
     });
-    localStorage.setItem("my_portfolio_simple", JSON.stringify(data));
+    localStorage.setItem("my_portfolio_sorted", JSON.stringify(data));
 }
 
 function loadHoldings(){
-    const data = JSON.parse(localStorage.getItem("my_portfolio_simple") || "[]");
+    const data = JSON.parse(localStorage.getItem("my_portfolio_sorted") || "[]");
     const tbody = document.querySelector("#holdings tbody");
     tbody.innerHTML = ""; 
     
@@ -203,11 +203,10 @@ function isTaiwanStock(sym){
     return /^\d{4,6}$/.test(sym) || /^00\d{3}[a-zA-Z]?$/.test(sym);
 }
 
-function getFormatDate(){
+// 修正：不再猜測昨天或週五，而是直接抓過去 15 天
+function getSafeStartDate(){
     let d = new Date();
-    if(d.getDay() === 0) d.setDate(d.getDate() - 2); 
-    else if(d.getDay() === 6) d.setDate(d.getDate() - 1); 
-    else if(d.getHours() < 14) d.setDate(d.getDate() - 1); 
+    d.setDate(d.getDate() - 15); // 往前推 15 天，確保涵蓋長假
     return d.toISOString().split('T')[0];
 }
 
@@ -223,19 +222,22 @@ async function updatePrices(){
         
         try {
             if(isTaiwanStock(sym)){
-                // 台股
-                const date = getFormatDate();
-                const url = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPrice&data_id=${sym}&start_date=${date}&token=${FINMIND_TOKEN}`;
+                // 台股：使用範圍搜尋 (過去15天)
+                const startDate = getSafeStartDate();
+                const url = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPrice&data_id=${sym}&start_date=${startDate}&token=${FINMIND_TOKEN}`;
                 const res = await fetch(url);
                 const json = await res.json();
+                
+                // 邏輯：從回傳的陣列中，取「最後一筆」(即最新日期)
                 if(json.data && json.data.length > 0){
-                    const p = json.data[json.data.length - 1].close;
+                    const lastData = json.data[json.data.length - 1]; // 關鍵修改
+                    const p = lastData.close;
                     priceCell.innerText = `${p} TWD`;
                 } else {
-                    priceCell.innerText = "待更新";
+                    priceCell.innerText = "查無";
                 }
             } else {
-                // 美股
+                // 美股：Finnhub 預設就是給最新價格
                 const url = `https://finnhub.io/api/v1/quote?symbol=${sym}&token=${FINNHUB_KEY}`;
                 const res = await fetch(url);
                 const json = await res.json();
@@ -252,14 +254,14 @@ async function updatePrices(){
     recalcTotal();
 }
 
-// —— 計算總值 & 排序 & 繪圖 (核心修改) ——
+// —— 計算總值 & 排序 & 繪圖 ——
 function recalcTotal(){
     const tbody = document.querySelector("#holdings tbody");
     const rows = Array.from(document.querySelectorAll("#holdings tbody tr"));
     let totalTwd = 0;
     let rowData = [];
 
-    // 1. 先計算所有行的數值
+    // 1. 計算
     rows.forEach(row => {
         const inputs = row.getElementsByTagName("input");
         const sym = inputs[0].value.trim().toUpperCase();
@@ -270,13 +272,11 @@ function recalcTotal(){
 
         if(priceText.includes("USD")) price = parseFloat(priceText) * usdToTwd;
         else if(priceText.includes("TWD")) price = parseFloat(priceText);
-        // 如果是 ... 或 Error，暫時當作 0，避免排序壞掉
 
         const value = Math.floor(shares * price);
         row.querySelector(".total").innerText = value.toLocaleString();
         totalTwd += value;
 
-        // 收集數據以便排序
         if(value >= 0) {
             rowData.push({
                 element: row,
@@ -287,15 +287,15 @@ function recalcTotal(){
         }
     });
 
-    // 2. 依照總值由大到小排序
+    // 2. 排序 (大到小)
     rowData.sort((a, b) => b.value - a.value);
 
-    // 3. 重新排列 DOM (表格行)
+    // 3. 重排 DOM
     rowData.forEach(item => {
-        tbody.appendChild(item.element); // appendChild 會移動既有的元素
+        tbody.appendChild(item.element);
     });
 
-    // 4. 更新百分比 (排序後更新視覺)
+    // 4. 更新 %
     rows.forEach(row => {
         const valStr = row.querySelector(".total").innerText.replace(/,/g, '');
         const val = parseFloat(valStr) || 0;
@@ -303,17 +303,16 @@ function recalcTotal(){
         row.querySelector(".pct").innerText = `${pct}%`;
     });
 
-    // 更新總金額顯示
     document.getElementById("totalDisplay").innerText = totalTwd.toLocaleString();
     
-    // 5. 繪圖 (傳入已排序的資料)
+    // 5. 繪圖
     drawChart(rowData, totalTwd);
 }
 
 function drawChart(items, total){
     if(items.length === 0) return;
     
-    // items 已經在 recalcTotal 排好序了，這裡直接取前 8 名
+    // 取前 8 名 + 其他
     const topCount = 8;
     const topItems = items.slice(0, topCount);
     const otherItems = items.slice(topCount);
@@ -323,12 +322,10 @@ function drawChart(items, total){
     topItems.forEach((item, index) => {
         labels.push(item.symbol || "未命名");
         data.push(item.value);
-        // 循環使用顏色
         if(item.isTw) chartColors.push(colors.tw[index % colors.tw.length]);
         else chartColors.push(colors.us[index % colors.us.length]);
     });
 
-    // 處理 "其他"
     if(otherItems.length > 0){
         labels.push("其他");
         data.push(otherItems.reduce((sum, i) => sum + i.value, 0));
