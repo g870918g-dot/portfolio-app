@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>我的資產配置</title>
+<title>我的資產配置 (美感升級版)</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
 /* —— CSS 樣式區 —— */
-body { font-family: "Microsoft JhengHei","PingFang TC",sans-serif; margin: 0; padding: 16px; background-color: #f4f6f8; color: #333; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Microsoft JhengHei", sans-serif; margin: 0; padding: 20px; background-color: #f8f9fa; color: #495057; }
 
 /* 佈局容器 */
-.container { display: flex; flex-wrap: wrap; gap: 20px; }
+.container { display: flex; flex-wrap: wrap; gap: 24px; }
 .left { flex: 1 1 100%; }
 .right { flex: 1 1 100%; max-width: 100%; margin-top: 20px; }
 
@@ -20,53 +20,72 @@ body { font-family: "Microsoft JhengHei","PingFang TC",sans-serif; margin: 0; pa
     .right { flex:1 1 35%; max-width:400px; margin-top:0; } 
 }
 
-/* 表格樣式 */
-table { border-collapse: collapse; width: 100%; font-size: 14px; background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border-radius: 8px; overflow: hidden; }
-th, td { border-bottom: 1px solid #eee; padding: 10px 8px; text-align: center; }
-th { background-color: #f1f3f5; font-weight: 600; color: #555; }
-tr { transition: background-color 0.3s; }
-input { width: 80px; font-size: 14px; text-align: center; border: 1px solid #ddd; padding: 6px; border-radius: 4px; }
-input:focus { outline: none; border-color: #007bff; }
+/* 表格樣式 (美化版) */
+table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 14px; background: white; box-shadow: 0 4px 20px rgba(0,0,0,0.03); border-radius: 12px; overflow: hidden; }
+th, td { border-bottom: 1px solid #f1f3f5; padding: 14px 12px; text-align: center; vertical-align: middle; }
+th { background-color: #ffffff; font-weight: 700; color: #868e96; text-transform: uppercase; font-size: 12px; letter-spacing: 0.5px; border-bottom: 2px solid #f1f3f5; }
+tr:last-child td { border-bottom: none; }
+tr { transition: all 0.2s ease; position: relative; }
+tr:hover { background-color: #f8f9fa; transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.05); z-index: 1; }
 
-button { margin: 4px 2px; font-size: 14px; cursor: pointer; padding: 8px 16px; background-color: #007bff; color: white; border: none; border-radius: 4px; transition: 0.2s; }
-button:hover { background-color: #0056b3; }
-button.refresh-btn { background-color: #28a745; }
-button.refresh-btn:hover { background-color: #218838; }
+/* 輸入框優化 */
+input { width: 90%; font-size: 14px; text-align: center; border: 1px solid #dee2e6; padding: 8px; border-radius: 6px; background: #fdfdfd; transition: border-color 0.2s; }
+input:focus { outline: none; border-color: #74c0fc; background: white; box-shadow: 0 0 0 3px rgba(116, 192, 252, 0.15); }
+
+/* 按鈕樣式 */
+button { font-weight: 600; font-size: 13px; cursor: pointer; padding: 10px 18px; border: none; border-radius: 8px; transition: all 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+button:active { transform: translateY(1px); }
+.btn-primary { background-color: #339af0; color: white; }
+.btn-primary:hover { background-color: #228be6; box-shadow: 0 4px 10px rgba(51, 154, 240, 0.3); }
+.btn-success { background-color: #51cf66; color: white; }
+.btn-success:hover { background-color: #40c057; box-shadow: 0 4px 10px rgba(81, 207, 102, 0.3); }
 
 /* 資訊面板 */
 .info-panel {
-    background: white; padding: 15px; border-radius: 8px; margin-bottom: 15px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;
+    background: white; padding: 20px; border-radius: 12px; margin-bottom: 24px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.03); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; border: 1px solid #f1f3f5;
 }
-.info-item { margin-right: 20px; font-size: 16px; font-weight: bold; color: #444; }
-.info-value { color: #007bff; margin-left: 5px; }
+.info-item { margin-right: 20px; font-size: 15px; font-weight: 600; color: #adb5bd; }
+.info-value { color: #343a40; margin-left: 8px; font-size: 20px; font-family: 'Segoe UI', sans-serif; font-weight: 700; }
 
 /* Chart Container */
 .chart-container { 
     background: white; 
-    padding: 15px; 
-    border-radius: 10px; 
-    box-shadow: 0 2px 5px rgba(0,0,0,0.05); 
-    min-height: 300px;
+    padding: 24px; 
+    border-radius: 16px; 
+    box-shadow: 0 4px 20px rgba(0,0,0,0.03); 
+    min-height: 320px;
+    border: 1px solid #f1f3f5;
+    position: relative;
 }
 
+/* 分類標籤條 (Row Indicators) */
+.row-tw { border-left: 4px solid #ff8787; } /* 台股紅條 */
+.row-us { border-left: 4px solid #4dabf7; } /* 美股藍條 */
+
+/* 標籤 Badge */
+.tag { font-size: 10px; padding: 2px 6px; border-radius: 4px; color: white; margin-right: 4px; font-weight: bold; vertical-align: middle; }
+.tag-tw { background-color: #ff8787; }
+.tag-us { background-color: #4dabf7; }
+
 @media (max-width: 480px) {
-  .info-panel { flex-direction: column; align-items: flex-start; gap: 10px; }
-  table { font-size: 12px; }
-  input { width: 100%; box-sizing: border-box; }
+  .info-panel { flex-direction: column; align-items: flex-start; gap: 12px; }
+  table { font-size: 13px; }
+  .info-value { font-size: 18px; }
+  .container { gap: 16px; }
 }
 </style>
 </head>
 <body>
 
-<h2>我的資產配置</h2>
+<h2 style="color:#343a40; font-weight:800; margin-bottom: 20px;">我的資產配置</h2>
 
 <div class="info-panel">
     <div class="info-item">
-        匯率: <span id="rateDisplay" class="info-value">載入中...</span>
+        匯率 <span id="rateDisplay" class="info-value">...</span>
     </div>
     <div class="info-item">
-        總資產: <span id="totalDisplay" class="info-value">0</span> <span style="font-size:12px;color:#888;">TWD</span>
+        總資產 <span id="totalDisplay" class="info-value">0</span> <span style="font-size:14px;color:#adb5bd; font-weight:normal;">TWD</span>
     </div>
 </div>
 
@@ -75,18 +94,18 @@ button.refresh-btn:hover { background-color: #218838; }
     <table id="holdings">
       <thead>
         <tr>
-          <th style="width:20%">代碼</th>
+          <th style="width:25%">代碼</th>
           <th style="width:20%">股數</th>
-          <th style="width:25%">市價</th>
+          <th style="width:20%">市價</th>
           <th style="width:25%">總值 (排序)</th>
           <th style="width:10%">%</th>
         </tr>
       </thead>
       <tbody></tbody>
     </table>
-    <div style="margin-top:15px; display:flex; gap:10px;">
-        <button onclick="addRow()">+ 新增標的</button>
-        <button onclick="updatePrices()" class="refresh-btn">↻ 更新股價</button>
+    <div style="margin-top:20px; display:flex; gap:12px;">
+        <button onclick="addRow()" class="btn-primary">+ 新增標的</button>
+        <button onclick="updatePrices()" class="btn-success">↻ 更新股價</button>
     </div>
   </div>
 
@@ -104,10 +123,14 @@ let usdToTwd = 30; // 預設匯率
 const FINNHUB_KEY = "d5ofc59r01qjast6ddl0d5ofc59r01qjast6ddlg";  
 const FINMIND_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNi0wMS0yMiAwMjowMzo1MyIsInVzZXJfaWQiOiJnODcwOTE4ZyIsImVtYWlsIjoiZzg3MDkxOGdAZ21haWwuY29tIiwiaXAiOiI2MS4yMzAuMzcuMzEifQ.sunKX_jHdSZAmXUMztvTVOjm9ZCZYNN_xm1fm-Xi7aE"; 
 
+// —— 🎨 新版莫蘭迪配色 ——
 const colors = {
-    tw: ["#e74c3c", "#e67e22", "#f1c40f", "#d35400", "#c0392b"], 
-    us: ["#3498db", "#2980b9", "#9b59b6", "#8e44ad", "#2c3e50"], 
-    other: "#95a5a6"
+    // 台股 (暖色系)：柔和紅、珊瑚粉、暖橘、紫丁香、鵝黃
+    tw: ["#FF8787", "#F06595", "#FF922B", "#CC5DE8", "#FFD43B"], 
+    // 美股 (冷色系)：天空藍、青瓷綠、靛青、湖水綠、深藍
+    us: ["#4DABF7", "#69DB7C", "#748FFC", "#38D9A9", "#339AF0"], 
+    // 其他
+    other: "#CED4DA"
 };
 
 // —— 初始化 ——
@@ -141,7 +164,6 @@ async function updateExchangeRate(){
             rateLoaded = true; 
         }
     } catch(e){
-        console.log("匯率抓取失敗:", e);
         document.getElementById("rateDisplay").innerText = "連線異常 (預設 30)";
     }
     recalcTotal();
@@ -157,16 +179,15 @@ function saveHoldings(){
         const shares = inputs[1].value;
         if(sym) data.push({symbol: sym, shares: shares});
     });
-    localStorage.setItem("my_portfolio_sorted", JSON.stringify(data));
+    localStorage.setItem("my_portfolio_style", JSON.stringify(data));
 }
 
 function loadHoldings(){
-    const data = JSON.parse(localStorage.getItem("my_portfolio_sorted") || "[]");
+    const data = JSON.parse(localStorage.getItem("my_portfolio_style") || "[]");
     const tbody = document.querySelector("#holdings tbody");
     tbody.innerHTML = ""; 
     
     if(data.length === 0) {
-        // 預設範例
         addRow({symbol: "00631L", shares: 1000}); 
         addRow({symbol: "TSM", shares: 10});
     } else {
@@ -178,12 +199,16 @@ function loadHoldings(){
 function addRow(data = null){
     const tbody = document.querySelector("#holdings tbody");
     const tr = document.createElement("tr");
+    
+    // 預設樣式，稍後在 recalcTotal 會根據代碼自動加上顏色條
     tr.innerHTML = `
-        <td><input type="text" placeholder="代碼" onchange="saveHoldings();" value="${data ? data.symbol : ''}"></td>
+        <td style="position:relative;">
+            <input type="text" placeholder="代碼" onchange="saveHoldings(); recalcTotal();" value="${data ? data.symbol : ''}" style="font-weight:bold; color:#495057;">
+        </td>
         <td><input type="number" placeholder="股數" onchange="saveHoldings(); recalcTotal();" value="${data ? data.shares : 0}"></td>
-        <td class="price">-</td>
-        <td class="total">0</td>
-        <td class="pct">0%</td>
+        <td class="price" style="color:#868e96;">-</td>
+        <td class="total" style="font-weight:600; color:#343a40;">0</td>
+        <td class="pct" style="color:#868e96; font-size:12px;">0%</td>
     `;
     
     tr.ondblclick = function() {
@@ -195,7 +220,8 @@ function addRow(data = null){
     };
     
     tbody.appendChild(tr);
-    saveHoldings();
+    // 不立即存檔，避免空行影響
+    if(data) saveHoldings();
 }
 
 // —— 股價更新 ——
@@ -203,10 +229,9 @@ function isTaiwanStock(sym){
     return /^\d{4,6}$/.test(sym) || /^00\d{3}[a-zA-Z]?$/.test(sym);
 }
 
-// 修正：不再猜測昨天或週五，而是直接抓過去 15 天
 function getSafeStartDate(){
     let d = new Date();
-    d.setDate(d.getDate() - 15); // 往前推 15 天，確保涵蓋長假
+    d.setDate(d.getDate() - 15);
     return d.toISOString().split('T')[0];
 }
 
@@ -222,22 +247,19 @@ async function updatePrices(){
         
         try {
             if(isTaiwanStock(sym)){
-                // 台股：使用範圍搜尋 (過去15天)
                 const startDate = getSafeStartDate();
                 const url = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPrice&data_id=${sym}&start_date=${startDate}&token=${FINMIND_TOKEN}`;
                 const res = await fetch(url);
                 const json = await res.json();
                 
-                // 邏輯：從回傳的陣列中，取「最後一筆」(即最新日期)
                 if(json.data && json.data.length > 0){
-                    const lastData = json.data[json.data.length - 1]; // 關鍵修改
+                    const lastData = json.data[json.data.length - 1]; 
                     const p = lastData.close;
                     priceCell.innerText = `${p} TWD`;
                 } else {
                     priceCell.innerText = "查無";
                 }
             } else {
-                // 美股：Finnhub 預設就是給最新價格
                 const url = `https://finnhub.io/api/v1/quote?symbol=${sym}&token=${FINNHUB_KEY}`;
                 const res = await fetch(url);
                 const json = await res.json();
@@ -245,7 +267,6 @@ async function updatePrices(){
                 else priceCell.innerText = "Error";
             }
         } catch(e) {
-            console.error(sym, e);
             priceCell.innerText = "Err";
         }
     });
@@ -254,19 +275,29 @@ async function updatePrices(){
     recalcTotal();
 }
 
-// —— 計算總值 & 排序 & 繪圖 ——
+// —— 計算 & 分類顯示 ——
 function recalcTotal(){
     const tbody = document.querySelector("#holdings tbody");
     const rows = Array.from(document.querySelectorAll("#holdings tbody tr"));
     let totalTwd = 0;
     let rowData = [];
 
-    // 1. 計算
+    // 1. 計算數值
     rows.forEach(row => {
         const inputs = row.getElementsByTagName("input");
         const sym = inputs[0].value.trim().toUpperCase();
         const shares = parseFloat(inputs[1].value) || 0;
         
+        // 判斷台美股，並加上視覺標籤
+        const isTw = isTaiwanStock(sym);
+        
+        // 移除舊的 class，重新分類
+        row.classList.remove("row-tw", "row-us");
+        if(sym) {
+            if(isTw) row.classList.add("row-tw");
+            else row.classList.add("row-us");
+        }
+
         const priceText = row.querySelector(".price").innerText;
         let price = 0;
 
@@ -282,12 +313,12 @@ function recalcTotal(){
                 element: row,
                 symbol: sym,
                 value: value,
-                isTw: isTaiwanStock(sym)
+                isTw: isTw
             });
         }
     });
 
-    // 2. 排序 (大到小)
+    // 2. 排序
     rowData.sort((a, b) => b.value - a.value);
 
     // 3. 重排 DOM
@@ -312,7 +343,7 @@ function recalcTotal(){
 function drawChart(items, total){
     if(items.length === 0) return;
     
-    // 取前 8 名 + 其他
+    // Top 8 + Other
     const topCount = 8;
     const topItems = items.slice(0, topCount);
     const otherItems = items.slice(topCount);
@@ -320,14 +351,17 @@ function drawChart(items, total){
     let labels = [], data = [], chartColors = [];
 
     topItems.forEach((item, index) => {
-        labels.push(item.symbol || "未命名");
+        // 在 Chart 的標籤上也加上分類標記 (TW/US)
+        const typeLabel = item.isTw ? "(TW)" : "(US)";
+        labels.push(`${item.symbol}`);
         data.push(item.value);
+        
         if(item.isTw) chartColors.push(colors.tw[index % colors.tw.length]);
         else chartColors.push(colors.us[index % colors.us.length]);
     });
 
     if(otherItems.length > 0){
-        labels.push("其他");
+        labels.push("Other");
         data.push(otherItems.reduce((sum, i) => sum + i.value, 0));
         chartColors.push(colors.other);
     }
@@ -337,18 +371,31 @@ function drawChart(items, total){
 
     chartInstance = new Chart(ctx, {
         type: 'doughnut',
-        data: { labels, datasets: [{ data, backgroundColor: chartColors, borderWidth: 0 }] },
+        data: { labels, datasets: [{ data, backgroundColor: chartColors, borderWidth: 0, hoverOffset: 10 }] },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            layout: { padding: 10 },
             plugins: {
-                legend: { position: 'right', labels: { boxWidth: 12 } },
+                legend: { 
+                    position: 'bottom', 
+                    labels: { 
+                        boxWidth: 10, 
+                        usePointStyle: true, 
+                        pointStyle: 'circle',
+                        padding: 15,
+                        font: { family: "'Segoe UI', sans-serif", size: 12 }
+                    } 
+                },
                 tooltip: {
+                    backgroundColor: 'rgba(52, 58, 64, 0.9)',
+                    padding: 12,
+                    cornerRadius: 8,
                     callbacks: {
                         label: function(context) {
                             let val = context.raw;
                             let pct = ((val / total) * 100).toFixed(1);
-                            return ` ${context.label}: ${pct}% (${val.toLocaleString()})`;
+                            return ` ${context.label}: ${pct}% ($${val.toLocaleString()})`;
                         }
                     }
                 }
