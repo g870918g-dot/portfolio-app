@@ -23,14 +23,17 @@ body { font-family: "Microsoft JhengHei","PingFang TC",sans-serif; margin: 0; pa
 /* 表格樣式 */
 table { border-collapse: collapse; width: 100%; font-size: 14px; background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border-radius: 8px; overflow: hidden; }
 th, td { border-bottom: 1px solid #eee; padding: 10px 8px; text-align: center; }
-th { background-color: #f1f3f5; font-weight: 600; color: #555; }
+th { background-color: #f1f3f5; font-weight: 600; color: #555; cursor: pointer; }
+tr { transition: background-color 0.3s; }
 input { width: 80px; font-size: 14px; text-align: center; border: 1px solid #ddd; padding: 6px; border-radius: 4px; }
-button { margin: 4px 2px; font-size: 14px; cursor: pointer; padding: 8px 16px; background-color: #007bff; color: white; border: none; border-radius: 4px; }
+input:focus { outline: none; border-color: #007bff; }
+
+button { margin: 4px 2px; font-size: 14px; cursor: pointer; padding: 8px 16px; background-color: #007bff; color: white; border: none; border-radius: 4px; transition: 0.2s; }
 button:hover { background-color: #0056b3; }
 button.refresh-btn { background-color: #28a745; }
 button.refresh-btn:hover { background-color: #218838; }
 
-/* 資訊面板樣式 */
+/* 資訊面板 */
 .info-panel {
     background: white; padding: 15px; border-radius: 8px; margin-bottom: 15px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;
@@ -38,19 +41,14 @@ button.refresh-btn:hover { background-color: #218838; }
 .info-item { margin-right: 20px; font-size: 16px; font-weight: bold; color: #444; }
 .info-value { color: #007bff; margin-left: 5px; }
 
-/* VIX 容器樣式 (修正為無內距，讓 Widget 填滿) */
-.vix-container {
-    background: white; 
-    padding: 0; 
-    border-radius: 10px; 
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05); 
-    border: 1px solid #e0e0e0; 
-    margin-bottom: 20px;
-    overflow: hidden; 
-}
-
 /* Chart Container */
-.chart-container { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+.chart-container { 
+    background: white; 
+    padding: 15px; 
+    border-radius: 10px; 
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05); 
+    min-height: 300px;
+}
 
 @media (max-width: 480px) {
   .info-panel { flex-direction: column; align-items: flex-start; gap: 10px; }
@@ -61,7 +59,7 @@ button.refresh-btn:hover { background-color: #218838; }
 </head>
 <body>
 
-<h2>我的資產配置123</h2>
+<h2>我的資產配置</h2>
 
 <div class="info-panel">
     <div class="info-item">
@@ -80,7 +78,7 @@ button.refresh-btn:hover { background-color: #218838; }
           <th style="width:20%">代碼</th>
           <th style="width:20%">股數</th>
           <th style="width:25%">市價</th>
-          <th style="width:25%">總值</th>
+          <th style="width:25%">總值 (排序)</th>
           <th style="width:10%">%</th>
         </tr>
       </thead>
@@ -93,29 +91,6 @@ button.refresh-btn:hover { background-color: #218838; }
   </div>
 
   <div class="right">
-    
-    <div class="vix-container" style="padding:0; border: 3px solid #28a745; border-radius: 10px; margin-bottom: 20px; overflow: hidden;">
-        <div class="tradingview-widget-container">
-          <div class="tradingview-widget-container__widget"></div>
-          <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js" async>
-          {
-            "symbol": "TVC:VIX",
-            "width": "100%",
-            "height": "220",
-            "locale": "zh-TW",
-            "dateRange": "1M",
-            "colorTheme": "light",
-            "trendLineColor": "#2962FF",
-            "underLineColor": "rgba(41, 98, 255, 0.3)",
-            "underLineBottomColor": "rgba(41, 98, 255, 0)",
-            "isTransparent": false,
-            "autosize": false,
-            "largeChartUrl": ""
-          }
-          </script>
-        </div>
-    </div>
-
     <div class="chart-container">
         <canvas id="chart"></canvas>
     </div>
@@ -140,21 +115,17 @@ window.onload = function() {
     console.log("App Started...");
     try {
         loadHoldings();       // 1. 建立表格
-        updateExchangeRate(); // 2. 抓匯率 (含防卡死機制)
+        updateExchangeRate(); // 2. 抓匯率
     } catch (e) {
         console.error("Init Error:", e);
-        alert("程式初始化失敗，請檢查 Console");
     }
 };
 
-// —— 匯率邏輯 (加強版：防卡死) ——
+// —— 匯率邏輯 ——
 async function updateExchangeRate(){
     let rateLoaded = false;
-    
-    // 設定一個 2 秒的計時器，如果 API 太慢，直接用預設值，避免卡住
     setTimeout(() => {
         if(!rateLoaded) {
-            console.log("匯率 API 回應超時，使用預設值 30");
             document.getElementById("rateDisplay").innerText = "30.00 (預設)";
             usdToTwd = 30;
             recalcTotal();
@@ -167,13 +138,12 @@ async function updateExchangeRate(){
         if(data && data.rates && data.rates.TWD){
             usdToTwd = data.rates.TWD;
             document.getElementById("rateDisplay").innerText = `1 USD ≈ ${usdToTwd.toFixed(2)} TWD`;
-            rateLoaded = true; // 標記為成功
+            rateLoaded = true; 
         }
     } catch(e){
         console.log("匯率抓取失敗:", e);
         document.getElementById("rateDisplay").innerText = "連線異常 (預設 30)";
     }
-    
     recalcTotal();
 }
 
@@ -187,11 +157,11 @@ function saveHoldings(){
         const shares = inputs[1].value;
         if(sym) data.push({symbol: sym, shares: shares});
     });
-    localStorage.setItem("my_portfolio_final", JSON.stringify(data));
+    localStorage.setItem("my_portfolio_simple", JSON.stringify(data));
 }
 
 function loadHoldings(){
-    const data = JSON.parse(localStorage.getItem("my_portfolio_final") || "[]");
+    const data = JSON.parse(localStorage.getItem("my_portfolio_simple") || "[]");
     const tbody = document.querySelector("#holdings tbody");
     tbody.innerHTML = ""; 
     
@@ -209,14 +179,13 @@ function addRow(data = null){
     const tbody = document.querySelector("#holdings tbody");
     const tr = document.createElement("tr");
     tr.innerHTML = `
-        <td><input type="text" placeholder="代碼" onchange="saveHoldings()" value="${data ? data.symbol : ''}"></td>
-        <td><input type="number" placeholder="股數" onchange="saveHoldings()" value="${data ? data.shares : 0}"></td>
+        <td><input type="text" placeholder="代碼" onchange="saveHoldings();" value="${data ? data.symbol : ''}"></td>
+        <td><input type="number" placeholder="股數" onchange="saveHoldings(); recalcTotal();" value="${data ? data.shares : 0}"></td>
         <td class="price">-</td>
         <td class="total">0</td>
         <td class="pct">0%</td>
     `;
     
-    // 雙擊刪除功能
     tr.ondblclick = function() {
         if(confirm("確定移除此股票？")) {
             this.remove();
@@ -283,12 +252,14 @@ async function updatePrices(){
     recalcTotal();
 }
 
-// —— 計算總值 ——
+// —— 計算總值 & 排序 & 繪圖 (核心修改) ——
 function recalcTotal(){
-    const rows = document.querySelectorAll("#holdings tbody tr");
+    const tbody = document.querySelector("#holdings tbody");
+    const rows = Array.from(document.querySelectorAll("#holdings tbody tr"));
     let totalTwd = 0;
-    let items = [];
+    let rowData = [];
 
+    // 1. 先計算所有行的數值
     rows.forEach(row => {
         const inputs = row.getElementsByTagName("input");
         const sym = inputs[0].value.trim().toUpperCase();
@@ -299,15 +270,32 @@ function recalcTotal(){
 
         if(priceText.includes("USD")) price = parseFloat(priceText) * usdToTwd;
         else if(priceText.includes("TWD")) price = parseFloat(priceText);
+        // 如果是 ... 或 Error，暫時當作 0，避免排序壞掉
 
         const value = Math.floor(shares * price);
         row.querySelector(".total").innerText = value.toLocaleString();
         totalTwd += value;
 
-        if(value > 0) items.push({ symbol: sym, value: value, isTw: isTaiwanStock(sym) });
+        // 收集數據以便排序
+        if(value >= 0) {
+            rowData.push({
+                element: row,
+                symbol: sym,
+                value: value,
+                isTw: isTaiwanStock(sym)
+            });
+        }
     });
 
-    // 更新 %
+    // 2. 依照總值由大到小排序
+    rowData.sort((a, b) => b.value - a.value);
+
+    // 3. 重新排列 DOM (表格行)
+    rowData.forEach(item => {
+        tbody.appendChild(item.element); // appendChild 會移動既有的元素
+    });
+
+    // 4. 更新百分比 (排序後更新視覺)
     rows.forEach(row => {
         const valStr = row.querySelector(".total").innerText.replace(/,/g, '');
         const val = parseFloat(valStr) || 0;
@@ -315,29 +303,32 @@ function recalcTotal(){
         row.querySelector(".pct").innerText = `${pct}%`;
     });
 
-    // 更新總金額
+    // 更新總金額顯示
     document.getElementById("totalDisplay").innerText = totalTwd.toLocaleString();
     
-    // 繪圖
-    drawChart(items, totalTwd);
+    // 5. 繪圖 (傳入已排序的資料)
+    drawChart(rowData, totalTwd);
 }
 
 function drawChart(items, total){
     if(items.length === 0) return;
-    items.sort((a,b) => b.value - a.value);
-
-    const topItems = items.slice(0, 5);
-    const otherItems = items.slice(5);
+    
+    // items 已經在 recalcTotal 排好序了，這裡直接取前 8 名
+    const topCount = 8;
+    const topItems = items.slice(0, topCount);
+    const otherItems = items.slice(topCount);
     
     let labels = [], data = [], chartColors = [];
 
     topItems.forEach((item, index) => {
-        labels.push(item.symbol);
+        labels.push(item.symbol || "未命名");
         data.push(item.value);
+        // 循環使用顏色
         if(item.isTw) chartColors.push(colors.tw[index % colors.tw.length]);
         else chartColors.push(colors.us[index % colors.us.length]);
     });
 
+    // 處理 "其他"
     if(otherItems.length > 0){
         labels.push("其他");
         data.push(otherItems.reduce((sum, i) => sum + i.value, 0));
@@ -371,6 +362,3 @@ function drawChart(items, total){
 </script>
 </body>
 </html>
-
-
-
